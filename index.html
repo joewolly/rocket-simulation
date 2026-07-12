@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#071014" />
+    <meta name="description" content="SEA LEVEL — an interactive offshore rocket landing simulation." />
+    <title>SEA LEVEL — Offshore Landing Simulator</title>
+  </head>
+  <body>
+    <canvas id="scene" aria-label="3D offshore rocket landing simulation"></canvas>
+
+    <header class="brand"><span>SEA</span> LEVEL <i>///</i></header>
+    <aside class="mission">
+      <span class="eyebrow">MISSION 04</span>
+      <strong>LAND ON <em>ODYSSEY</em></strong>
+      <span id="statusText">Approach corridor acquired</span>
+    </aside>
+
+    <section class="telemetry" aria-label="Flight telemetry">
+      <div><span>ALTITUDE</span><strong id="altitude">--</strong><small>m</small></div>
+      <div><span>VERT SPEED</span><strong id="velocity">--</strong><small>m/s</small></div>
+      <div><span>FUEL</span><strong id="fuel">--</strong><small>%</small></div>
+      <div><span>DRIFT</span><strong id="drift">--</strong><small>m/s</small></div>
+    </section>
+
+    <div class="reticle" aria-hidden="true"><span></span><i></i></div>
+    <div id="callout" class="callout">DECK LOCKED <b>●</b></div>
+
+    <section class="throttle-panel">
+      <label>THROTTLE <output id="throttleValue">55%</output></label>
+      <input id="throttle" type="range" min="0" max="100" value="55" aria-label="Engine throttle" />
+      <div class="ticks"></div>
+    </section>
+
+    <nav class="actions" aria-label="Simulation actions">
+      <button id="cameraButton">CAM <kbd>C</kbd></button>
+      <button id="pauseButton">PAUSE <kbd>P</kbd></button>
+      <button id="restartButton">RESTART <kbd>R</kbd></button>
+    </nav>
+
+    <div id="hint" class="hint">ARROWS TILT · W/S THROTTLE · C CAMERA</div>
+
+    <div class="touch-controls" aria-label="Touch flight controls">
+      <div class="touch-pad">
+        <button data-control="forward" aria-label="Tilt forward">▲</button>
+        <button data-control="left" aria-label="Tilt left">◀</button>
+        <button data-control="back" aria-label="Tilt backward">▼</button>
+        <button data-control="right" aria-label="Tilt right">▶</button>
+      </div>
+      <div class="touch-throttle">
+        <button data-control="throttleUp" aria-label="Increase throttle">+</button>
+        <button data-control="throttleDown" aria-label="Decrease throttle">−</button>
+      </div>
+    </div>
+
+    <div id="modal" class="modal hidden" role="dialog" aria-modal="true">
+      <div class="modal-card">
+        <span id="modalEyebrow" class="eyebrow">MISSION STATUS</span>
+        <h1 id="modalTitle">PAUSED</h1>
+        <p id="modalCopy">Flight computer holding simulation time.</p>
+        <button id="modalAction">RESUME FLIGHT</button>
+      </div>
+    </div>
+
+    <noscript>This simulation requires JavaScript.</noscript>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
