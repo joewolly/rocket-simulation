@@ -7,6 +7,9 @@ export interface Controls {
   right: boolean;
   throttleUp: boolean;
   throttleDown: boolean;
+  assistTiltX?: number;
+  assistTiltZ?: number;
+  assistThrottle?: number;
 }
 
 export interface FlightState {
@@ -56,15 +59,18 @@ export function stepFlight(state: FlightState, controls: Controls, dt: number) {
   state.time += dt;
 
   const throttleRate = 0.34;
-  if (controls.throttleUp) state.throttle += throttleRate * dt;
-  if (controls.throttleDown) state.throttle -= throttleRate * dt;
+  if (controls.assistThrottle !== undefined) state.throttle = approach(state.throttle, controls.assistThrottle, throttleRate * 1.8 * dt);
+  else {
+    if (controls.throttleUp) state.throttle += throttleRate * dt;
+    if (controls.throttleDown) state.throttle -= throttleRate * dt;
+  }
   state.throttle = Math.max(0, Math.min(1, state.throttle));
 
   const tiltRate = 0.42;
   const returnRate = 0.22;
   const tiltLimit = 0.28;
-  const xTarget = (controls.forward ? -tiltLimit : 0) + (controls.back ? tiltLimit : 0);
-  const zTarget = (controls.left ? -tiltLimit : 0) + (controls.right ? tiltLimit : 0);
+  const xTarget = controls.assistTiltX ?? ((controls.forward ? -tiltLimit : 0) + (controls.back ? tiltLimit : 0));
+  const zTarget = controls.assistTiltZ ?? ((controls.left ? -tiltLimit : 0) + (controls.right ? tiltLimit : 0));
   state.tiltX = approach(state.tiltX, xTarget, (xTarget ? tiltRate : returnRate) * dt);
   state.tiltZ = approach(state.tiltZ, zTarget, (zTarget ? tiltRate : returnRate) * dt);
 

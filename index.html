@@ -10,7 +10,7 @@
   <body>
     <canvas id="scene" aria-label="3D offshore rocket landing simulation"></canvas>
 
-    <header class="brand"><span>SEA</span> LEVEL <i>///</i></header>
+    <header class="brand"><span class="brand-mark">S/L</span><span><b>SEA</b> LEVEL<small>OFFSHORE FLIGHT LAB</small></span></header>
     <aside class="mission">
       <span class="eyebrow">MISSION 04</span>
       <strong>LAND ON <em>ODYSSEY</em></strong>
@@ -24,6 +24,13 @@
       <div><span>DRIFT</span><strong id="drift">--</strong><small>m/s</small></div>
     </section>
 
+    <aside class="environment" aria-label="Environmental conditions">
+      <span class="eyebrow">LOCAL CONDITIONS</span>
+      <div><i class="wind-arrow">↗</i><strong>7.4</strong><small>M/S WIND</small></div>
+      <div><strong>1.2</strong><small>M SWELL</small></div>
+      <div><strong>042°</strong><small>VESSEL HDG</small></div>
+    </aside>
+
     <div class="reticle" aria-hidden="true"><span></span><i></i></div>
     <div id="callout" class="callout">DECK LOCKED <b>●</b></div>
 
@@ -33,13 +40,19 @@
       <div class="ticks"></div>
     </section>
 
-    <nav class="actions" aria-label="Simulation actions">
-      <button id="cameraButton">CAM <kbd>C</kbd></button>
-      <button id="pauseButton">PAUSE <kbd>P</kbd></button>
-      <button id="restartButton">RESTART <kbd>R</kbd></button>
+    <nav class="actions command-dock" aria-label="Simulation actions">
+      <span class="dock-status"><i></i><small>FLIGHT</small></span>
+      <button id="cameraButton" title="Change camera"><b>◉</b><span>CAMERA</span><kbd>C</kbd></button>
+      <button id="autoButton" title="Toggle landing assist"><b>⌁</b><span>ASSIST</span><kbd>A</kbd></button>
+      <button id="pauseButton" title="Pause flight"><b>Ⅱ</b><span>PAUSE</span><kbd>P</kbd></button>
+      <button id="restartButton" title="Restart approach"><b>↻</b><span>RESET</span><kbd>R</kbd></button>
     </nav>
 
-    <div id="hint" class="hint">ARROWS TILT · W/S THROTTLE · C CAMERA</div>
+    <div id="hint" class="hint"><span>FLIGHT COMPUTER ONLINE</span> ARROWS TILT · W/S THROTTLE · DRAG TO ORBIT · C CAMERA</div>
+
+    <div class="flight-tape" aria-hidden="true">
+      <span>30</span><i></i><span>20</span><i></i><span>10</span><i></i><span>0</span>
+    </div>
 
     <div class="touch-controls" aria-label="Touch flight controls">
       <div class="touch-pad">

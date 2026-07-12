@@ -6,8 +6,10 @@ html, body { width:100%; height:100%; margin:0; overflow:hidden; background:#071
 button, input { font:inherit; }
 #scene { position:fixed; inset:0; width:100%; height:100%; display:block; touch-action:none; }
 body::after { content:""; pointer-events:none; position:fixed; inset:0; background:linear-gradient(180deg,rgba(5,12,15,.05),rgba(5,12,15,.2)),repeating-linear-gradient(0deg,transparent 0 3px,rgba(255,255,255,.012) 4px); }
-.brand { position:fixed; top:26px; left:32px; font:700 24px/1 "Barlow Condensed"; letter-spacing:.06em; z-index:2; }
-.brand span { color:var(--orange); } .brand i { color:var(--orange); font-style:normal; margin-left:8px; letter-spacing:-.2em; }
+.brand { position:fixed; top:24px; left:30px; display:flex; align-items:center; gap:10px; font:600 21px/1 "Barlow Condensed"; letter-spacing:.08em; z-index:2; text-shadow:0 2px 14px #031014; }
+.brand > span:last-child { display:flex; flex-direction:column; color:var(--paper); } .brand b { color:var(--orange); font-weight:700; }
+.brand small { color:#aebcbd; font:500 7px/1.2 "DM Mono"; letter-spacing:.2em; margin-top:4px; }
+.brand-mark { display:grid; place-items:center; width:38px; height:38px; border:1px solid rgba(255,255,255,.3); background:rgba(5,13,16,.62); color:var(--orange); font:700 14px "Barlow Condensed"; clip-path:polygon(14% 0,100% 0,100% 86%,86% 100%,0 100%,0 14%); }
 .mission { position:fixed; top:82px; left:32px; display:flex; flex-direction:column; gap:3px; z-index:2; }
 .eyebrow { color:var(--orange); font:600 10px/1.2 "DM Mono"; letter-spacing:.16em; text-transform:uppercase; }
 .mission strong { font:600 22px/1.1 "Barlow Condensed"; letter-spacing:.04em; }
@@ -31,11 +33,12 @@ body::after { content:""; pointer-events:none; position:fixed; inset:0; backgrou
 #throttle::-webkit-slider-thumb { appearance:none; width:9px; height:17px; background:var(--paper); cursor:ns-resize; }
 #throttle::-moz-range-thumb { width:9px; height:17px; border:0; border-radius:0; background:var(--paper); }
 .ticks { height:7px; margin-top:6px; opacity:.35; background:repeating-linear-gradient(90deg,var(--paper) 0 1px,transparent 1px 23px); }
-.actions { position:fixed; right:32px; bottom:31px; display:flex; gap:8px; z-index:3; }
+.actions { position:fixed; left:50%; right:auto; bottom:22px; translate:-50% 0; display:flex; gap:2px; z-index:3; padding:5px; border:1px solid rgba(210,231,232,.18); background:rgba(4,13,17,.72); box-shadow:0 12px 40px rgba(0,0,0,.28); backdrop-filter:blur(14px); }
 button { border:1px solid rgba(233,238,233,.25); color:var(--paper); background:rgba(5,12,15,.52); padding:9px 12px; font-size:9px; letter-spacing:.08em; cursor:pointer; backdrop-filter:blur(6px); }
 button:hover,button:focus-visible { border-color:var(--orange); color:var(--orange); outline:none; }
 kbd { color:var(--muted); font:8px "DM Mono"; margin-left:7px; }
-.hint { position:fixed; left:50%; bottom:31px; translate:-50% 0; padding:8px 13px; color:#a5b3b3; background:rgba(5,12,15,.48); font-size:8px; letter-spacing:.09em; z-index:2; transition:opacity 1s; }
+.hint { position:fixed; left:50%; bottom:94px; translate:-50% 0; padding:8px 13px; color:#a5b3b3; background:rgba(5,12,15,.48); border-left:1px solid var(--orange); font-size:8px; letter-spacing:.09em; z-index:2; transition:opacity 1s; }
+.hint span { color:var(--orange); margin-right:10px; }
 .hint.hidden-hint { opacity:0; }
 .touch-controls { display:none; }
 .modal { position:fixed; inset:0; display:grid; place-items:center; background:rgba(2,8,10,.65); backdrop-filter:blur(8px); z-index:10; transition:opacity .2s; }
@@ -57,3 +60,36 @@ kbd { color:var(--muted); font:8px "DM Mono"; margin-left:7px; }
   .callout { display:none; }
 }
 @media (prefers-reduced-motion: reduce) { * { transition:none!important; } }
+
+/* flight lab surfaces */
+.environment { position:fixed; left:30px; top:48%; translate:0 -50%; display:grid; grid-template-columns:repeat(3,58px); gap:12px; z-index:2; padding-left:12px; border-left:1px solid rgba(255,90,31,.65); filter:drop-shadow(0 4px 12px #031014); }
+.environment > .eyebrow { position:absolute; left:12px; bottom:calc(100% + 11px); white-space:nowrap; }
+.environment div { display:flex; flex-direction:column; }
+.environment strong { font:600 16px/1 "Barlow Condensed"; color:#eef4ef; }
+.environment small { margin-top:4px; color:#8fa0a2; font-size:6px; letter-spacing:.12em; }
+.wind-arrow { position:absolute; left:-22px; top:1px; color:var(--orange); font-style:normal; font-size:13px; }
+.command-dock::before { content:"COMMAND DECK"; position:absolute; bottom:calc(100% + 8px); left:0; color:#93a2a3; font-size:6px; letter-spacing:.18em; }
+.command-dock button { position:relative; min-width:67px; height:50px; border:0; border-left:1px solid rgba(255,255,255,.08); padding:4px 8px; display:flex; flex-direction:column; justify-content:center; align-items:center; gap:3px; background:transparent; }
+.command-dock button b { color:#d7e1df; font:500 17px/1 "DM Mono"; }
+.command-dock button span { color:#829395; font-size:6px; letter-spacing:.12em; }
+.command-dock button kbd { position:absolute; right:5px; top:4px; margin:0; font-size:6px; opacity:.6; }
+.command-dock button:hover,.command-dock button.active { background:rgba(255,90,31,.13); }
+.command-dock button:hover b,.command-dock button.active b,.command-dock button.active span { color:var(--orange); }
+.dock-status { width:56px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px; }
+.dock-status i { width:7px; height:7px; border-radius:50%; background:#5ee18b; box-shadow:0 0 10px #5ee18b; }
+.dock-status small { color:#839395; font-size:6px; letter-spacing:.14em; }
+.flight-tape { position:fixed; right:29px; top:50%; translate:0 -50%; height:230px; width:28px; z-index:2; display:flex; flex-direction:column; justify-content:space-between; align-items:end; color:#99a8a8; font-size:7px; border-right:1px solid rgba(235,245,244,.26); padding-right:8px; }
+.flight-tape::before { content:"RADAR ALT"; position:absolute; bottom:calc(100% + 11px); right:-1px; width:60px; text-align:right; color:#7e8f91; font-size:6px; letter-spacing:.11em; }
+.flight-tape i { width:7px; height:1px; margin-right:-8px; background:rgba(235,245,244,.35); }
+.flight-tape::after { content:""; position:absolute; right:-3px; top:72%; width:7px; height:7px; rotate:45deg; background:var(--orange); box-shadow:0 0 9px rgba(255,90,31,.7); }
+.reticle { box-shadow:0 0 40px rgba(255,90,31,.07),inset 0 0 20px rgba(255,90,31,.04); }
+.telemetry div { box-shadow:inset 0 1px rgba(255,255,255,.04); }
+
+@media (max-width: 900px) {
+  .environment,.flight-tape { display:none; }
+  .command-dock button { min-width:58px; }
+}
+@media (max-width: 720px) {
+  .brand { top:14px; left:14px; } .brand-mark { width:32px; height:32px; }
+  .actions { display:none; }
+}

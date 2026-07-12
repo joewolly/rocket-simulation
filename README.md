@@ -21,7 +21,9 @@ npm run preview
 - Arrow keys: tilt the rocket
 - `W` / `S`: increase or decrease throttle
 - `Space` / `Left Shift`: alternate throttle controls
-- `C`: switch between chase and deck cameras
+- `C`: cycle chase, deck, and free-orbit cameras
+- Drag and scroll in orbit camera mode to inspect the scene
+- `A`: toggle the autonomous landing assist
 - `P` or `Escape`: pause/resume
 - `R`: restart the approach
 - On touch devices, use the on-screen flight pad and throttle buttons
