@@ -11,6 +11,9 @@ import { updateLandingAssist } from "./game/autopilot";
 import { pollGamepad, pulseGamepad } from "./game/input";
 import { loadRecords, recordLanding, saveRecords } from "./game/persistence";
 import { applyReplayState, ReplayRecorder } from "./game/replay";
+import { trackingCameraPose, type CameraMode } from "./render/cameraRig";
+import { createDebrief, medalForScore } from "./game/debrief";
+import { EnvironmentEffects } from "./render/environmentEffects";
 
 const canvas = document.querySelector<HTMLCanvasElement>("#scene")!;
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: "high-performance" });
@@ -62,17 +65,22 @@ const landingMarker = createLandingMarker();
 const clouds = createClouds();
 const exhaust = createExhaustTrail();
 const impactEffect = createImpactEffect();
-world.add(sky, ocean, ship, rocket, landingMarker, clouds, exhaust.points, impactEffect.group);
+const environmentEffects = new EnvironmentEffects();
+const ghostRocket = createGhostRocket(rocket);
+const replayPath = createReplayPath();
+world.add(sky, ocean, ship, rocket, ghostRocket, landingMarker, clouds, exhaust.points, impactEffect.group, environmentEffects.group, replayPath);
 
 let currentMission = MISSIONS[0];
 let state = createFlightState(currentMission.init);
 const controls: Controls = { forward: false, back: false, left: false, right: false, throttleUp: false, throttleDown: false };
 const recorder = new ReplayRecorder();
+const bestRecorder = new ReplayRecorder();
 const flightAudio = new FlightAudio();
 const records = loadRecords();
+const systemReducedMotion = matchMedia("(prefers-reduced-motion: reduce)");
 flightAudio.setEnabled(records.audioEnabled);
 let paused = false;
-let cameraMode = 0;
+let cameraMode: CameraMode = 0;
 let accumulator = 0;
 let previousTime = performance.now();
 let endShown = false;
@@ -81,6 +89,10 @@ let replaying = false;
 let replayTime = 0;
 let drawerOpen = false;
 let rateMode = false;
+let compareEnabled = true;
+let comparisonFrames = records.bestReplays[currentMission.id] ?? [];
+let lastFlightScore = 0;
+let cameraInitialized = false;
 const fixedDt = 1 / 120;
 const simulationRate = import.meta.env.DEV ? Math.max(1,Math.min(6,Number(new URLSearchParams(location.search).get("simSpeed"))||1)) : 1;
 
@@ -98,7 +110,12 @@ const ui = {
   closeMissionButton: document.querySelector<HTMLButtonElement>("#closeMissionButton")!, qualityButton: document.querySelector<HTMLButtonElement>("#qualityButton")!,
   stabilityButton: document.querySelector<HTMLButtonElement>("#stabilityButton")!,
   gamepadStatus: text("gamepadStatus"), windValue: text("windValue"), windArrow: text("windArrow"), swellValue: text("swellValue"),
+  weatherValue:text("weatherValue"),
   replayTimeline: text("replayTimeline"), replayScrubber: document.querySelector<HTMLInputElement>("#replayScrubber")!, replayTime: text("replayTime"),
+  flightCue: text("flightCue"), compareButton: document.querySelector<HTMLButtonElement>("#compareButton")!, missionObjectives:text("missionObjectives"),
+  comfortButton:document.querySelector<HTMLButtonElement>("#comfortButton")!,deadzoneButton:document.querySelector<HTMLButtonElement>("#deadzoneButton")!,trainingButton:document.querySelector<HTMLButtonElement>("#trainingButton")!,
+  drawerAudioButton:document.querySelector<HTMLButtonElement>("#drawerAudioButton")!,
+  debrief:text("debrief"),debriefMedal:text("debriefMedal"),debriefMetrics:text("debriefMetrics"),debriefObjectives:text("debriefObjectives"),
 };
 
 applyMissionPresentation();
@@ -115,7 +132,7 @@ renderer.setAnimationLoop(frame);
 function frame(now: number) {
   const elapsed = Math.min((now - previousTime) / 1000, 0.05);
   previousTime = now;
-  const pad = pollGamepad(controls);
+  const pad = pollGamepad(controls,records.gamepadDeadzone);
   ui.gamepadStatus.textContent = pad.connected ? "GAMEPAD: CONNECTED" : "GAMEPAD: NOT DETECTED";
   if (replaying && !paused) {
     replayTime = Math.min(recorder.duration, replayTime + elapsed);
@@ -132,7 +149,8 @@ function frame(now: number) {
   }
   updateWorld(now / 1000, elapsed);
   updateUi();
-  flightAudio.update(state.throttle, Math.hypot(state.velocity.x,state.velocity.y,state.velocity.z),state.stress,state.phase);
+  const altitude=Math.max(0,state.position.y-ROCKET_HALF_HEIGHT-deckHeightAt(state.position.x,state.position.z,state.time,state.seaState));
+  flightAudio.update(state.throttle, Math.hypot(state.velocity.x,state.velocity.y,state.velocity.z),state.stress,state.phase,altitude);
   composer.render();
 }
 
@@ -155,6 +173,7 @@ function updateWorld(visualTime: number, dt: number) {
   flame.rotation.z = state.gimbal.z * .8;
   updateExhaustTrail(exhaust, visualTime, dt, flameScale);
   updateImpactEffect(impactEffect,dt);
+  environmentEffects.update(visualTime,dt,state.position,state.seaState,records.cameraComfort||systemReducedMotion.matches);
   const feet=rocket.userData.feet as THREE.Mesh[];
   feet.forEach((foot,index)=>foot.position.y=-2.82+(state.legCompression[index]??0)*.12);
   clouds.children.forEach((cloud, index) => {
@@ -165,23 +184,25 @@ function updateWorld(visualTime: number, dt: number) {
   const water = ocean.material as THREE.ShaderMaterial;
   water.uniforms.uTime.value = visualTime;
 
+  if(replaying&&compareEnabled&&bestRecorder.hasReplay){
+    const comparison=bestRecorder.sample(Math.min(replayTime,bestRecorder.duration));
+    if(comparison){ ghostRocket.visible=true; ghostRocket.position.set(comparison.position.x,comparison.position.y,comparison.position.z); ghostRocket.rotation.set(comparison.tiltX,0,comparison.tiltZ); }
+  } else ghostRocket.visible=false;
+
   const desired = new THREE.Vector3();
   const target = new THREE.Vector3();
   orbit.enabled = cameraMode === 2 && !paused;
-  if (cameraMode === 0) {
-    desired.set(state.position.x + 25, state.position.y + 14, state.position.z + 32);
-    target.set(state.position.x * 0.35, Math.max(3, state.position.y - 7), state.position.z * 0.25);
-  } else if (cameraMode === 1) {
-    desired.set(-24, 12, 30);
-    target.set(state.position.x, Math.max(3, state.position.y), state.position.z);
-  } else {
+  if (cameraMode === 2) {
     orbit.target.lerp(new THREE.Vector3(state.position.x * .3, Math.max(3, state.position.y * .35), state.position.z * .2), 1 - Math.exp(-dt * 2));
     orbit.update();
+  } else {
+    const pose = trackingCameraPose(cameraMode, state.position, camera.aspect);
+    desired.set(pose.position.x, pose.position.y, pose.position.z);
+    target.set(pose.target.x, pose.target.y, pose.target.z);
   }
   if (cameraMode !== 2) {
-    const ease = 1 - Math.exp(-dt * 2.8);
+    const ease = 1 - Math.exp(-dt * (records.cameraComfort?4.6:2.8));
     camera.position.lerp(desired, ease);
-    if(state.phase==="flying"&&state.throttle>.35){ const shake=(state.throttle*.022+state.stress*.012); camera.position.x+=Math.sin(visualTime*47)*shake; camera.position.y+=Math.sin(visualTime*53)*shake; }
     camera.lookAt(target);
   }
 
@@ -190,7 +211,13 @@ function updateWorld(visualTime: number, dt: number) {
     pulseGamepad(state.phase==="landed"?.38:1,state.phase==="landed"?180:650);
     triggerImpactEffect(impactEffect,state.phase==="crashed");
     ui.replayButton.disabled = !recorder.hasReplay;
-    if(state.phase==="landed") { recordLanding(records,state.missionId,state.touchdownScore); renderMissionList(); }
+    lastFlightScore=state.touchdownScore;
+    comparisonFrames=structuredClone(records.bestReplays[state.missionId]??[]);
+    if(state.phase==="landed") {
+      const isBest=recordLanding(records,state.missionId,state.touchdownScore);
+      if(isBest){records.bestReplays[state.missionId]=recorder.export();saveRecords(records);}
+      renderMissionList();
+    }
     window.setTimeout(showEndState, 500);
   }
 }
@@ -331,11 +358,11 @@ function updateImpactEffect(effect:ImpactEffect,dt:number){
 function createOcean() {
   const geometry = new THREE.PlaneGeometry(500, 500, 80, 80);
   const material = new THREE.ShaderMaterial({
-    uniforms: { uTime: { value: 0 }, uDeep: { value: new THREE.Color(0x071b22) }, uTop: { value: new THREE.Color(0x1d525b) } },
-    vertexShader: `uniform float uTime; varying float vWave; varying vec3 vWorld;
-      void main(){ vec3 p=position; float a=sin(p.x*.12+uTime*.85)*.24; float b=sin(p.y*.085-uTime*.68)*.18; float c=sin((p.x+p.y)*.045+uTime*.42)*.30; float d=sin(length(p.xy)*.17-uTime*1.1)*.05; p.z=a+b+c+d; vWave=p.z; vec4 w=modelMatrix*vec4(p,1.); vWorld=w.xyz; gl_Position=projectionMatrix*viewMatrix*w; }`,
-    fragmentShader: `uniform vec3 uDeep; uniform vec3 uTop; varying float vWave; varying vec3 vWorld;
-      void main(){ vec3 dx=dFdx(vWorld),dy=dFdy(vWorld); vec3 n=normalize(cross(dx,dy)); if(n.y<0.)n=-n; vec3 viewDir=normalize(cameraPosition-vWorld); float fres=pow(1.-max(dot(n,viewDir),0.),3.); vec3 sunDir=normalize(vec3(-.45,.72,-.3)); float glint=pow(max(dot(reflect(-sunDir,n),viewDir),0.),90.); float foam=smoothstep(.34,.52,vWave)*.18; vec3 col=mix(uDeep,uTop,clamp(vWave+.48,0.,1.)); col+=fres*vec3(.2,.42,.46)+glint*vec3(1.,.72,.42)*1.8+foam; gl_FragColor=vec4(col,1.); }`,
+    uniforms: { uTime: { value: 0 }, uSeaState:{value:1},uRain:{value:0}, uDeep: { value: new THREE.Color(0x071b22) }, uTop: { value: new THREE.Color(0x1d525b) } },
+    vertexShader: `uniform float uTime; uniform float uSeaState; varying float vWave; varying vec3 vWorld;
+      void main(){ vec3 p=position; float scale=.7+uSeaState*.28; float a=sin(p.x*.105+uTime*.72)*.26; float b=sin(p.y*.078-uTime*.61)*.2; float c=sin((p.x+p.y)*.041+uTime*.37)*.33; float d=sin(length(p.xy)*.15-uTime*.92)*.07; p.z=(a+b+c+d)*scale; vWave=p.z; vec4 w=modelMatrix*vec4(p,1.); vWorld=w.xyz; gl_Position=projectionMatrix*viewMatrix*w; }`,
+    fragmentShader: `uniform vec3 uDeep; uniform vec3 uTop; uniform float uRain; uniform float uTime; varying float vWave; varying vec3 vWorld;
+      void main(){ vec3 dx=dFdx(vWorld),dy=dFdy(vWorld); vec3 n=normalize(cross(dx,dy)); if(n.y<0.)n=-n; vec3 viewDir=normalize(cameraPosition-vWorld); float fres=pow(1.-max(dot(n,viewDir),0.),3.); vec3 sunDir=normalize(vec3(-.45,.72,-.3)); float glint=pow(max(dot(reflect(-sunDir,n),viewDir),0.),90.); float crest=smoothstep(.34,.58,vWave); float rain=sin(vWorld.x*4.1+uTime*7.)*sin(vWorld.z*3.7-uTime*8.)*.5+.5; vec3 col=mix(uDeep,uTop,clamp(vWave+.5,0.,1.)); col+=fres*vec3(.18,.4,.45)+glint*vec3(1.,.72,.42)*1.55+crest*vec3(.18,.3,.29)+rain*uRain*.025; gl_FragColor=vec4(col,1.); }`,
   });
   const mesh = new THREE.Mesh(geometry, material);
   mesh.rotation.x = -Math.PI / 2;
@@ -465,6 +492,29 @@ function createRocket() {
   return group;
 }
 
+function createGhostRocket(source:THREE.Group){
+  const ghost=source.clone(true);
+  ghost.traverse(object=>{
+    if(!(object instanceof THREE.Mesh))return;
+    const material=(object.material as THREE.Material).clone();
+    material.transparent=true; material.opacity=.18; material.depthWrite=false;
+    if("color" in material)(material as THREE.MeshBasicMaterial).color.setHex(0x79e6ff);
+    object.material=material;
+  });
+  ghost.visible=false; ghost.renderOrder=3; return ghost;
+}
+
+function createReplayPath(){
+  const line=new THREE.Line(new THREE.BufferGeometry(),new THREE.LineBasicMaterial({color:0x71dff2,transparent:true,opacity:.42,depthWrite:false}));
+  line.visible=false; return line;
+}
+
+function updateReplayPath(){
+  replayPath.geometry.dispose();
+  replayPath.geometry=new THREE.BufferGeometry().setFromPoints(recorder.path.map(point=>new THREE.Vector3(point.x,point.y,point.z)));
+  replayPath.visible=replaying&&recorder.hasReplay;
+}
+
 function updateUi() {
   const deckY = deckHeightAt(state.position.x, state.position.z, state.time, state.seaState);
   const altitude = Math.max(0, state.position.y - ROCKET_HALF_HEIGHT - deckY);
@@ -483,7 +533,25 @@ function updateUi() {
   ui.throttle.style.setProperty("--fill", `${percent}%`);
   const targetDistance = Math.hypot(state.position.x, state.position.z);
   ui.callout.innerHTML = targetDistance < 5 ? "DECK LOCKED <b>●</b>" : "ALIGN WITH TARGET <b>◆</b>";
-  if (state.phase === "flying") ui.status.textContent = assistEnabled ? "Autoland guidance engaged" : altitude < 8 ? "Touchdown checks active" : targetDistance < 6 ? "Landing solution nominal" : "Correct lateral drift";
+  const tilt=Math.max(Math.abs(state.tiltX),Math.abs(state.tiltZ));
+  const vertical=Math.abs(state.velocity.y);
+  let cue="NOMINAL",severity:"nominal"|"caution"|"danger"="nominal";
+  if(state.fuel<.08){cue="FUEL CRITICAL";severity="danger";}
+  else if(altitude<12&&vertical>3.1){cue="SLOW DESCENT";severity="danger";}
+  else if(altitude<12&&drift>2.1){cue="ARREST DRIFT";severity="danger";}
+  else if(altitude<12&&tilt>.14){cue="LEVEL VEHICLE";severity="danger";}
+  else if(state.fuel<.18){cue="LOW RESERVE";severity="caution";}
+  else if(altitude<18&&(vertical>2.5||drift>1.5||tilt>.1)){cue="TIGHTEN ENVELOPE";severity="caution";}
+  ui.flightCue.className=`flight-cue ${severity}`; ui.flightCue.querySelector("strong")!.textContent=cue;
+  if (state.phase === "flying") {
+    const training=currentMission.id==="qualification"&&!records.tutorialSeen;
+    if(assistEnabled)ui.status.textContent="Autoland guidance engaged";
+    else if(training&&state.time<4)ui.status.textContent="Flight school: use tilt to center the reticle";
+    else if(training&&state.time<9)ui.status.textContent="Flight school: manage vertical speed with throttle";
+    else if(training&&state.time<14)ui.status.textContent="Flight school: arrive level inside the target ring";
+    else ui.status.textContent = altitude < 8 ? "Touchdown checks active" : targetDistance < 6 ? "Landing solution nominal" : "Correct lateral drift";
+    if(training&&state.time>=14){records.tutorialSeen=true;saveRecords(records);}
+  }
   if(replaying){
     ui.status.textContent="Flight replay telemetry";
     ui.replayScrubber.value=String(recorder.duration?replayTime/recorder.duration*100:0);
@@ -524,6 +592,15 @@ function bindInputs() {
   ui.audioButton.addEventListener("click",toggleAudio);
   ui.qualityButton.addEventListener("click",toggleQuality);
   ui.stabilityButton.addEventListener("click",toggleStabilityMode);
+  ui.comfortButton.addEventListener("click",toggleCameraComfort);
+  ui.deadzoneButton.addEventListener("click",cycleDeadzone);
+  ui.trainingButton.addEventListener("click",startTraining);
+  ui.drawerAudioButton.addEventListener("click",toggleAudio);
+  ui.compareButton.addEventListener("click",()=>{compareEnabled=!compareEnabled;ui.compareButton.classList.toggle("active",compareEnabled);});
+  document.querySelector("#touchCamera")!.addEventListener("click",changeCamera);
+  document.querySelector("#touchMission")!.addEventListener("click",toggleMissionDrawer);
+  document.querySelector("#touchAssist")!.addEventListener("click",()=>setAssist(!assistEnabled));
+  document.querySelector("#touchPause")!.addEventListener("click",()=>togglePause());
   document.querySelector("#pauseButton")!.addEventListener("click", () => togglePause());
   document.querySelector("#restartButton")!.addEventListener("click", () => resetFlight());
   ui.modalAction.addEventListener("click", () => state.phase === "flying" ? togglePause(false) : resetFlight());
@@ -548,7 +625,8 @@ function renderMissionList(){
     button.className=`mission-card${mission.id===currentMission.id?" active":""}${unlocked?"":" locked"}`;
     button.style.setProperty("--mission-accent",mission.accent);
     const best=records.bestScores[mission.id]??0;
-    button.innerHTML=`<span class="number">${mission.number}</span><span><strong>${mission.title}</strong><p>${mission.description}</p><em>${best?`PERSONAL BEST ${best}`:unlocked?"READY TO FLY":`REQUIRES ${mission.unlockScore} ON ${previous?.title.toUpperCase()}`}</em></span><small>${mission.difficulty}</small>`;
+    const medal=medalForScore(best,best>0);
+    button.innerHTML=`<span class="number">${mission.number}</span><span><strong>${mission.title}</strong><p>${mission.description}</p><em>${best?`${medal} · PERSONAL BEST ${best}`:unlocked?"READY TO FLY":`REQUIRES ${mission.unlockScore} ON ${previous?.title.toUpperCase()}`}</em></span><small>${mission.difficulty}</small>`;
     button.disabled=!unlocked;
     button.addEventListener("click",()=>selectMission(mission));
     ui.missionList.appendChild(button);
@@ -565,14 +643,20 @@ function applyMissionPresentation(){
   ui.missionNumber.textContent=`MISSION ${currentMission.number}`;
   const [first,...rest]=currentMission.title.toUpperCase().split(" ");
   ui.missionTitle.innerHTML=`${first} <em>${rest.join(" ")}</em>`;
-  const night=currentMission.id==="night";
-  scene.fog=new THREE.FogExp2(night?0x07121e:0x839194,night ? .018 : .012);
-  scene.background=new THREE.Color(night?0x07121e:0x819093);
+  const preset=currentMission.environment;
+  scene.fog=new THREE.FogExp2(preset.fogColor,preset.fogDensity);
+  scene.background=new THREE.Color(preset.fogColor);
   const skyMaterial=(sky as THREE.Mesh).material as THREE.ShaderMaterial;
-  skyMaterial.uniforms.topColor.value.setHex(night?0x061228:0x315c70);
-  skyMaterial.uniforms.horizonColor.value.setHex(night?0x18314b:0xb3c3c1);
-  skyMaterial.uniforms.bottomColor.value.setHex(night?0x030910:0x536e72);
-  sun.intensity=night ? .45 : 3.2;
+  skyMaterial.uniforms.topColor.value.setHex(preset.topColor); skyMaterial.uniforms.horizonColor.value.setHex(preset.horizonColor); skyMaterial.uniforms.bottomColor.value.setHex(preset.bottomColor);
+  sun.color.setHex(preset.sunColor);sun.intensity=preset.sunIntensity;hemi.intensity=preset.hemisphereIntensity;renderer.toneMappingExposure=preset.exposure;bloom.strength=preset.bloom;
+  clouds.children.forEach((cloud,index)=>((cloud as THREE.Sprite).material as THREE.SpriteMaterial).opacity=preset.cloudOpacity*(.72+(index%3)*.14));
+  const water=ocean.material as THREE.ShaderMaterial; water.uniforms.uDeep.value.setHex(preset.oceanDeep);water.uniforms.uTop.value.setHex(preset.oceanTop);water.uniforms.uSeaState.value=state.seaState;water.uniforms.uRain.value=preset.rain;
+  environmentEffects.apply(preset);
+  ui.weatherValue.textContent=preset.label.split(" /")[0];
+  document.body.dataset.environment=preset.weather;
+  ui.missionDrawer.style.setProperty("--mission-accent",currentMission.accent);
+  ui.missionObjectives.innerHTML=currentMission.objectives.map(objective=>`<div class="objective-row"><b>◇</b><span><strong>${objective.label}</strong>${objective.description}</span></div>`).join("");
+  updateSettingsLabels();
 }
 
 function toggleMissionDrawer(){
@@ -583,8 +667,9 @@ function toggleMissionDrawer(){
 
 function toggleReplay(){
   if(!recorder.hasReplay)return;
-  if(replaying){ replaying=false; ui.replayTimeline.classList.add("hidden"); ui.replayButton.classList.remove("active"); resetFlight(false); return; }
+  if(replaying){ replaying=false; ui.replayTimeline.classList.add("hidden"); ui.replayButton.classList.remove("active");replayPath.visible=false;ghostRocket.visible=false; resetFlight(false); return; }
   replaying=true; replayTime=0; paused=false; endShown=true; setAssist(false); hideModal();
+  bestRecorder.load(comparisonFrames);compareEnabled=bestRecorder.hasReplay;ui.compareButton.disabled=!bestRecorder.hasReplay;ui.compareButton.classList.toggle("active",compareEnabled);updateReplayPath();
   ui.replayTimeline.classList.remove("hidden"); ui.replayButton.classList.add("active");
   const sample=recorder.sample(0); if(sample)applyReplayState(state,sample);
 }
@@ -593,12 +678,18 @@ function toggleAudio(){
   records.audioEnabled=!records.audioEnabled; flightAudio.setEnabled(records.audioEnabled); saveRecords(records);
   ui.audioButton.classList.toggle("active",records.audioEnabled);
   const label=ui.audioButton.querySelector("span"); if(label)label.textContent=records.audioEnabled?"AUDIO":"MUTED";
+  updateSettingsLabels();
   if(records.audioEnabled)void flightAudio.unlock();
 }
 
 function toggleQuality(){
   records.quality=records.quality==="high"?"low":"high"; saveRecords(records); applyQuality();
 }
+
+function toggleCameraComfort(){records.cameraComfort=!records.cameraComfort;saveRecords(records);updateSettingsLabels();}
+function cycleDeadzone(){const values=[.08,.12,.18,.24],index=values.findIndex(value=>Math.abs(value-records.gamepadDeadzone)<.001);records.gamepadDeadzone=values[(index+1)%values.length];saveRecords(records);updateSettingsLabels();}
+function updateSettingsLabels(){ui.comfortButton.textContent=`CAMERA: ${records.cameraComfort?"COMFORT":"CINEMATIC"}`;ui.deadzoneButton.textContent=`STICK DEADZONE: ${Math.round(records.gamepadDeadzone*100)}%`;ui.drawerAudioButton.textContent=`AUDIO: ${records.audioEnabled?"ON":"MUTED"}`;}
+function startTraining(){records.tutorialSeen=false;saveRecords(records);currentMission=MISSIONS[0];drawerOpen=false;ui.missionDrawer.classList.add("hidden");resetFlight();applyMissionPresentation();renderMissionList();const hint=document.querySelector("#hint")!;hint.classList.remove("hidden-hint");hint.innerHTML="<span>FLIGHT SCHOOL ACTIVE</span> CENTER · CONTROL DESCENT · ARRIVE LEVEL";}
 
 function applyQuality(){
   const high=records.quality==="high";
@@ -610,13 +701,14 @@ function applyQuality(){
 }
 
 function changeCamera() {
-  cameraMode = (cameraMode + 1) % 3;
+  cameraMode = ((cameraMode + 1) % 3) as CameraMode;
   ui.cameraButton.classList.toggle("active",cameraMode===2);
   const label=ui.cameraButton.querySelector("span"); if(label)label.textContent=["CHASE","DECK","ORBIT"][cameraMode];
   if(cameraMode===2){ camera.position.set(31,20,38); orbit.target.set(0,8,0); orbit.update(); }
 }
 function setAssist(value:boolean){
   assistEnabled=value && state.phase==="flying";
+  if(assistEnabled)state.assistUsed=true;
   ui.autoButton.classList.toggle("active",assistEnabled);
   controls.assistTiltX=controls.assistTiltZ=controls.assistThrottle=undefined;
   controls.rateMode=assistEnabled?false:rateMode;
@@ -628,14 +720,19 @@ function toggleStabilityMode(){
 }
 function togglePause(force?: boolean) { if (state.phase !== "flying"&&!replaying) return; setPaused(force ?? !paused); if (paused) showModal("FLIGHT PAUSED", "Simulation time is frozen. Your landing solution is preserved.", "RESUME FLIGHT", `MISSION ${currentMission.number}`); else hideModal(); }
 function setPaused(value: boolean) { paused = value; const label=ui.pauseButton.querySelector("span"); if(label)label.textContent=value?"RESUME":"PAUSE"; orbit.enabled=cameraMode===2&&!value; }
-function resetFlight(clearReplay=true) { state = createFlightState(currentMission.init); paused = false; endShown = false; accumulator = 0; replaying=false; replayTime=0; setAssist(false); hideModal(); ui.replayTimeline.classList.add("hidden"); ui.replayButton.classList.remove("active"); if(clearReplay){recorder.reset();ui.replayButton.disabled=true;} }
+function resetFlight(clearReplay=true) { state = createFlightState(currentMission.init); paused = false; endShown = false; accumulator = 0; replaying=false; replayTime=0; setAssist(false); hideModal(); ui.replayTimeline.classList.add("hidden"); ui.replayButton.classList.remove("active");replayPath.visible=false;ghostRocket.visible=false; if(clearReplay){recorder.reset();ui.replayButton.disabled=true;} snapTrackingCamera(); }
 function showEndState() {
-  if (state.phase === "landed") showModal("TOUCHDOWN", `Odyssey secured. Score ${state.touchdownScore}. Vertical ${state.touchdownVerticalSpeed.toFixed(1)} m/s · drift ${state.touchdownDrift.toFixed(1)} m/s.`, "FLY AGAIN", "MISSION COMPLETE");
-  else showModal("VEHICLE LOST", `Touchdown limits exceeded. Peak tilt ${(state.maxTilt*180/Math.PI).toFixed(1)}° · structural load ${state.maxStress.toFixed(1)}.`, "RETRY APPROACH", "MISSION FAILED");
+  const debrief=createDebrief(state,currentMission);
+  if (state.phase === "landed") showModal("TOUCHDOWN", `Contact at ${state.time.toFixed(1)} s · score ${state.touchdownScore}. ${debrief.summary}`, "FLY AGAIN", "MISSION COMPLETE");
+  else showModal("VEHICLE LOST", `Contact at ${state.time.toFixed(1)} s. ${debrief.summary}`, "RETRY APPROACH", "MISSION FAILED");
+  ui.debrief.classList.remove("hidden");ui.debriefMedal.textContent=debrief.medal;
+  ui.debriefMetrics.innerHTML=debrief.metrics.map(metric=>`<div style="--metric-color:${metric.score>70?"#65d88d":metric.score>35?"#ffc45f":"#ff5a1f"}"><span>${metric.label}</span><strong>${metric.value}</strong></div>`).join("");
+  ui.debriefObjectives.innerHTML=debrief.objectives.map(objective=>`<div class="${objective.complete?"":"miss"}"><span>${objective.label}</span><b>${objective.complete?"COMPLETE":"MISSED"}</b></div>`).join("")+(debrief.failureReasons.length?debrief.failureReasons.map(reason=>`<div class="miss"><span>LIMIT</span><b>${reason}</b></div>`).join(""):"");
   ui.modalReplay.classList.toggle("hidden",!recorder.hasReplay);
 }
-function showModal(title: string, copy: string, action: string, eyebrow: string) { ui.modalTitle.textContent = title; ui.modalCopy.textContent = copy; ui.modalAction.textContent = action; ui.modalEyebrow.textContent = eyebrow; ui.modalReplay.classList.add("hidden"); ui.modal.classList.remove("hidden"); }
+function showModal(title: string, copy: string, action: string, eyebrow: string) { ui.modalTitle.textContent = title; ui.modalCopy.textContent = copy; ui.modalAction.textContent = action; ui.modalEyebrow.textContent = eyebrow; ui.modalReplay.classList.add("hidden");ui.debrief.classList.add("hidden"); ui.modal.classList.remove("hidden"); }
 function hideModal() { ui.modal.classList.add("hidden"); }
 function formatTime(seconds:number){const minutes=Math.floor(seconds/60),secs=seconds-minutes*60;return `${String(minutes).padStart(2,"0")}:${secs.toFixed(1).padStart(4,"0")}`;}
-function resize() { const w = innerWidth, h = innerHeight; camera.aspect = w / h; camera.updateProjectionMatrix(); renderer.setSize(w, h, false); composer.setSize(w,h); bloom.setSize(w,h); }
+function snapTrackingCamera(){if(cameraMode===2)return;const pose=trackingCameraPose(cameraMode,state.position,camera.aspect);camera.position.set(pose.position.x,pose.position.y,pose.position.z);camera.lookAt(pose.target.x,pose.target.y,pose.target.z);}
+function resize() { const w = innerWidth, h = innerHeight; camera.aspect = w / h; camera.updateProjectionMatrix(); renderer.setSize(w, h, false); composer.setSize(w,h); bloom.setSize(w,h); if(!cameraInitialized){snapTrackingCamera();cameraInitialized=true;} }
 function text(id: string) { return document.querySelector<HTMLElement>(`#${id}`)!; }

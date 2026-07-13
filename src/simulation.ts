@@ -46,6 +46,11 @@ export interface FlightState {
   touchdownScore: number;
   touchdownVerticalSpeed: number;
   touchdownDrift: number;
+  touchdownDistance: number;
+  touchdownTilt: number;
+  touchdownAngularSpeed: number;
+  touchdownContacts: number;
+  assistUsed: boolean;
   maxTilt: number;
   maxStress: number;
   missionId: string;
@@ -84,6 +89,11 @@ export function createFlightState(init: FlightInit = {}): FlightState {
     touchdownScore: 0,
     touchdownVerticalSpeed: 0,
     touchdownDrift: 0,
+    touchdownDistance: 0,
+    touchdownTilt: 0,
+    touchdownAngularSpeed: 0,
+    touchdownContacts: 0,
+    assistUsed: false,
     maxTilt: 0,
     maxStress: 0,
     missionId: init.missionId ?? "qualification",
@@ -215,6 +225,10 @@ function resolveContact(state: FlightState, deckY: number, contacts: number) {
 
   state.touchdownVerticalSpeed = verticalSpeed;
   state.touchdownDrift = horizontalSpeed;
+  state.touchdownDistance = targetDistance;
+  state.touchdownTilt = tilt;
+  state.touchdownAngularSpeed = angularSpeed;
+  state.touchdownContacts = contacts;
   state.position.y = Math.max(state.position.y, deckY + ROCKET_HALF_HEIGHT);
   state.phase = safe ? "landed" : "crashed";
   state.touchdownScore = safe

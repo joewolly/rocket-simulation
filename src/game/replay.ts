@@ -11,6 +11,10 @@ export class ReplayRecorder {
 
   reset() { this.frames = []; this.lastRecorded = -1; }
 
+  load(frames:ReplayFrame[]) { this.frames=structuredClone(frames); this.lastRecorded=this.frames.at(-1)?.t??-1; }
+
+  export() { return structuredClone(this.frames); }
+
   record(state: FlightState) {
     if (state.time - this.lastRecorded < 1 / 20 && state.phase === "flying") return;
     this.lastRecorded = state.time;
@@ -19,6 +23,7 @@ export class ReplayRecorder {
 
   get duration() { return this.frames.at(-1)?.t ?? 0; }
   get hasReplay() { return this.frames.length > 2; }
+  get path() { return this.frames.map(frame=>({...frame.state.position})); }
 
   sample(time: number) {
     if (!this.frames.length) return null;

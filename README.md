@@ -15,6 +15,7 @@ Production build and verification:
 npm test
 npm run test:e2e
 npm run build
+git diff --check
 ```
 
 The Playwright browser must be installed once with `npx playwright install chromium`.
@@ -27,10 +28,12 @@ The Playwright browser must be installed once with `npx playwright install chrom
 - Four independent landing-leg contact points
 - Touchdown limits for vertical speed, drift, tilt, and angular rate
 - Attitude-hold, direct-rate, and autonomous landing modes
-- Procedural engine/wind/impact audio and gamepad haptics
-- 20 Hz serializable flight recorder with camera-independent replay scrubbing
-- Saved mission progression and personal best scores
-- High/low graphics modes and responsive touch controls
+- Radar-altitude callouts, contextual landing-envelope cues, layered procedural audio, and gamepad haptics
+- 20 Hz serializable flight recorder with camera-independent scrubbing, flight-path traces, and personal-best ghosts
+- Detailed post-flight grading for center accuracy, vertical speed, drift, attitude, fuel reserve, and optional objectives
+- Saved mission progression, medals, personal-best scores, best-flight replays, and flight-school state
+- High/low graphics modes, comfort/cinematic camera follow, gamepad deadzone calibration, and responsive touch controls
+- Mission-driven sky, fog, ocean, lighting, clouds, rain, stars, vessel wake, and sea spray
 
 ## Missions
 
@@ -38,6 +41,8 @@ The Playwright browser must be installed once with `npx playwright install chrom
 2. **Crosswind Vector** — strong lateral wind and reduced fuel
 3. **Black Horizon** — night recovery with heavier deck motion
 4. **Heavy Sea** — extreme swell, gusting wind, and narrow fuel margin
+5. **Whiteout Corridor** — dense sea fog and deceptive quartering wind
+6. **Last Light** — dusk glare and a fuel-sensitive long approach
 
 Complete each mission above its unlock threshold to open the next.
 
@@ -57,6 +62,9 @@ Complete each mission above its unlock threshold to open the next.
 - `R`: restart the approach
 - Gamepad: left stick for pitch/roll and triggers for analog throttle
 - Touch devices: on-screen flight pad and throttle buttons
+- Touch quick actions: missions, camera, landing assist, and pause
+
+The mission drawer also contains graphics quality, control mode, camera comfort, audio, gamepad deadzone, optional objectives, and flight-school controls. Strong camera shake is not used; comfort mode tightens camera following and reduces non-essential environmental motion.
 
 ## Architecture
 
@@ -67,6 +75,9 @@ Complete each mission above its unlock threshold to open the next.
 - `src/game/audio.ts`: procedural Web Audio flight feedback
 - `src/game/replay.ts`: serializable recorder and playback sampling
 - `src/game/persistence.ts`: local pilot records and settings
+- `src/game/debrief.ts`: touchdown grading, medals, failure reasons, and optional objectives
+- `src/render/cameraRig.ts`: deterministic chase and deck camera framing
+- `src/render/environmentEffects.ts`: procedural weather, stars, wake, and spray presentation
 - `src/render/assetManifest.ts`: stable GLB runtime contract
 - `tests/simulation.test.ts`: deterministic physics regression suite
 - `tests/e2e/simulation.spec.ts`: desktop, mobile, WebGL, touchdown, and replay QA

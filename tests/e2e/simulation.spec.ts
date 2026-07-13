@@ -14,8 +14,11 @@ test("desktop flight shell, controls, and mission drawer",async({page})=>{
   await expect(page.locator("#cameraButton span")).toHaveText("CHASE");
   await page.locator("#missionButton").click();
   await expect(page.locator("#missionDrawer")).not.toHaveClass(/hidden/);
-  await expect(page.locator(".mission-card")).toHaveCount(4);
+  await expect(page.locator(".mission-card")).toHaveCount(6);
   await expect(page.locator(".mission-card").nth(1)).toBeDisabled();
+  await expect(page.locator("#missionObjectives .objective-row")).toHaveCount(2);
+  await page.locator("#comfortButton").click();
+  await expect(page.locator("#comfortButton")).toContainText("CINEMATIC");
   await page.screenshot({path:"test-results/desktop-flight.png",fullPage:true});
   expect(errors).toEqual([]);
 });
@@ -26,6 +29,7 @@ test("mobile flight controls preserve the playfield",async({page})=>{
   await expect(page.locator(".touch-controls")).toBeVisible();
   await expect(page.locator(".command-dock")).toBeHidden();
   await expect(page.locator("[data-control=forward]")).toBeVisible();
+  await expect(page.locator("#touchCamera")).toBeVisible();
   const overflow=await page.evaluate(()=>document.documentElement.scrollWidth>document.documentElement.clientWidth);
   expect(overflow).toBe(false);
   await page.screenshot({path:"test-results/mobile-flight.png",fullPage:true});
@@ -36,8 +40,22 @@ test("assisted flight reaches touchdown and exposes replay",async({page})=>{
   await page.goto("/?simSpeed=4");
   await page.keyboard.press("KeyA");
   await expect(page.locator("#modalTitle")).toHaveText("TOUCHDOWN",{timeout:22_000});
+  await expect(page.locator("#debrief")).not.toHaveClass(/hidden/);
+  await expect(page.locator("#debriefMetrics > div")).toHaveCount(5);
   await expect(page.locator("#replayButton")).toBeEnabled();
+  await page.screenshot({path:"test-results/touchdown-debrief.png",fullPage:true});
   await page.locator("#modalReplay").click();
   await expect(page.locator("#replayTimeline")).not.toHaveClass(/hidden/);
   await page.screenshot({path:"test-results/touchdown-replay.png",fullPage:true});
+});
+
+test("weather presets give later missions a distinct environment",async({page})=>{
+  await page.addInitScript(()=>localStorage.setItem("sea-level-pilot-records-v2",JSON.stringify({bestScores:{qualification:100,crosswind:100,night:100,"heavy-sea":100,whiteout:100}})));
+  await page.goto("/");
+  await page.locator("#missionButton").click();
+  await page.locator(".mission-card").nth(4).click();
+  await expect(page.locator("body")).toHaveAttribute("data-environment","fog");
+  await expect(page.locator("#missionTitle")).toContainText("WHITEOUT");
+  await expect(page.locator("#weatherValue")).toHaveText("DENSE FOG");
+  await page.screenshot({path:"test-results/fog-mission.png",fullPage:true});
 });

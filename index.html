@@ -28,11 +28,12 @@
       <span class="eyebrow">LOCAL CONDITIONS</span>
       <div><i id="windArrow" class="wind-arrow">↗</i><strong id="windValue">--</strong><small>M/S WIND</small></div>
       <div><strong id="swellValue">--</strong><small>SEA STATE</small></div>
-      <div><strong>042°</strong><small>VESSEL HDG</small></div>
+      <div><strong id="weatherValue">CLEAR</strong><small>WEATHER</small></div>
     </aside>
 
     <div class="reticle" aria-hidden="true"><span></span><i></i></div>
     <div id="callout" class="callout">DECK LOCKED <b>●</b></div>
+    <div id="flightCue" class="flight-cue nominal" role="status" aria-live="polite"><span>FLIGHT ENVELOPE</span><strong>NOMINAL</strong></div>
 
     <section class="throttle-panel">
       <label>THROTTLE <output id="throttleValue">55%</output></label>
@@ -58,14 +59,19 @@
     </div>
 
     <section id="replayTimeline" class="replay-timeline hidden" aria-label="Replay controls">
-      <span>REPLAY</span><input id="replayScrubber" type="range" min="0" max="100" value="0" /><output id="replayTime">00:00.0</output>
+      <span>REPLAY</span><input id="replayScrubber" type="range" min="0" max="100" value="0" /><output id="replayTime">00:00.0</output><button id="compareButton" title="Toggle personal-best ghost">BEST GHOST</button>
     </section>
 
     <aside id="missionDrawer" class="drawer hidden" aria-label="Mission selection">
       <header><div><span class="eyebrow">FLIGHT PROGRAM</span><h2>RECOVERY MISSIONS</h2></div><button id="closeMissionButton" aria-label="Close missions">×</button></header>
       <p>Qualify on Odyssey, then progress through increasingly difficult recovery conditions.</p>
       <div id="missionList" class="mission-list"></div>
-      <footer><button id="qualityButton">GRAPHICS: HIGH</button><button id="stabilityButton">CONTROL: ATTITUDE HOLD</button><span id="gamepadStatus">GAMEPAD: NOT DETECTED</span></footer>
+      <section class="flight-brief" aria-label="Mission objectives"><span class="eyebrow">OPTIONAL OBJECTIVES</span><div id="missionObjectives"></div></section>
+      <footer>
+        <button id="qualityButton">GRAPHICS: HIGH</button><button id="stabilityButton">CONTROL: ATTITUDE HOLD</button>
+        <button id="comfortButton">CAMERA: COMFORT</button><button id="deadzoneButton">STICK DEADZONE: 12%</button>
+        <button id="drawerAudioButton">AUDIO: ON</button><button id="trainingButton">REPLAY FLIGHT SCHOOL</button><span id="gamepadStatus">GAMEPAD: NOT DETECTED</span>
+      </footer>
     </aside>
 
     <div class="touch-controls" aria-label="Touch flight controls">
@@ -79,6 +85,12 @@
         <button data-control="throttleUp" aria-label="Increase throttle">+</button>
         <button data-control="throttleDown" aria-label="Decrease throttle">−</button>
       </div>
+      <div class="touch-actions">
+        <button id="touchMission" aria-label="Choose mission">◇</button>
+        <button id="touchCamera" aria-label="Change camera">◉</button>
+        <button id="touchAssist" aria-label="Toggle landing assist">⌁</button>
+        <button id="touchPause" aria-label="Pause flight">Ⅱ</button>
+      </div>
     </div>
 
     <div id="modal" class="modal hidden" role="dialog" aria-modal="true">
@@ -86,6 +98,11 @@
         <span id="modalEyebrow" class="eyebrow">MISSION STATUS</span>
         <h1 id="modalTitle">PAUSED</h1>
         <p id="modalCopy">Flight computer holding simulation time.</p>
+        <section id="debrief" class="debrief hidden" aria-label="Flight debrief">
+          <div id="debriefMedal" class="debrief-medal">QUALIFIED</div>
+          <div id="debriefMetrics" class="debrief-metrics"></div>
+          <div id="debriefObjectives" class="debrief-objectives"></div>
+        </section>
         <button id="modalAction">RESUME FLIGHT</button>
         <button id="modalReplay" class="secondary-action hidden">VIEW REPLAY</button>
       </div>
