@@ -12,8 +12,8 @@
 
     <header class="brand"><span class="brand-mark">S/L</span><span><b>SEA</b> LEVEL<small>OFFSHORE FLIGHT LAB</small></span></header>
     <aside class="mission">
-      <span class="eyebrow">MISSION 04</span>
-      <strong>LAND ON <em>ODYSSEY</em></strong>
+      <span id="missionNumber" class="eyebrow">MISSION 01</span>
+      <strong id="missionTitle">DECK <em>QUALIFICATION</em></strong>
       <span id="statusText">Approach corridor acquired</span>
     </aside>
 
@@ -26,8 +26,8 @@
 
     <aside class="environment" aria-label="Environmental conditions">
       <span class="eyebrow">LOCAL CONDITIONS</span>
-      <div><i class="wind-arrow">↗</i><strong>7.4</strong><small>M/S WIND</small></div>
-      <div><strong>1.2</strong><small>M SWELL</small></div>
+      <div><i id="windArrow" class="wind-arrow">↗</i><strong id="windValue">--</strong><small>M/S WIND</small></div>
+      <div><strong id="swellValue">--</strong><small>SEA STATE</small></div>
       <div><strong>042°</strong><small>VESSEL HDG</small></div>
     </aside>
 
@@ -42,17 +42,31 @@
 
     <nav class="actions command-dock" aria-label="Simulation actions">
       <span class="dock-status"><i></i><small>FLIGHT</small></span>
+      <button id="missionButton" title="Choose mission"><b>◇</b><span>MISSIONS</span><kbd>M</kbd></button>
       <button id="cameraButton" title="Change camera"><b>◉</b><span>CAMERA</span><kbd>C</kbd></button>
       <button id="autoButton" title="Toggle landing assist"><b>⌁</b><span>ASSIST</span><kbd>A</kbd></button>
+      <button id="replayButton" title="Replay last flight" disabled><b>▷</b><span>REPLAY</span><kbd>V</kbd></button>
+      <button id="audioButton" title="Toggle flight audio"><b>♪</b><span>AUDIO</span><kbd>U</kbd></button>
       <button id="pauseButton" title="Pause flight"><b>Ⅱ</b><span>PAUSE</span><kbd>P</kbd></button>
       <button id="restartButton" title="Restart approach"><b>↻</b><span>RESET</span><kbd>R</kbd></button>
     </nav>
 
-    <div id="hint" class="hint"><span>FLIGHT COMPUTER ONLINE</span> ARROWS TILT · W/S THROTTLE · DRAG TO ORBIT · C CAMERA</div>
+    <div id="hint" class="hint"><span>FLIGHT COMPUTER ONLINE</span> ARROWS TILT · W/S THROTTLE · A ASSIST · M MISSIONS · C CAMERA</div>
 
     <div class="flight-tape" aria-hidden="true">
       <span>30</span><i></i><span>20</span><i></i><span>10</span><i></i><span>0</span>
     </div>
+
+    <section id="replayTimeline" class="replay-timeline hidden" aria-label="Replay controls">
+      <span>REPLAY</span><input id="replayScrubber" type="range" min="0" max="100" value="0" /><output id="replayTime">00:00.0</output>
+    </section>
+
+    <aside id="missionDrawer" class="drawer hidden" aria-label="Mission selection">
+      <header><div><span class="eyebrow">FLIGHT PROGRAM</span><h2>RECOVERY MISSIONS</h2></div><button id="closeMissionButton" aria-label="Close missions">×</button></header>
+      <p>Qualify on Odyssey, then progress through increasingly difficult recovery conditions.</p>
+      <div id="missionList" class="mission-list"></div>
+      <footer><button id="qualityButton">GRAPHICS: HIGH</button><button id="stabilityButton">CONTROL: ATTITUDE HOLD</button><span id="gamepadStatus">GAMEPAD: NOT DETECTED</span></footer>
+    </aside>
 
     <div class="touch-controls" aria-label="Touch flight controls">
       <div class="touch-pad">
@@ -73,6 +87,7 @@
         <h1 id="modalTitle">PAUSED</h1>
         <p id="modalCopy">Flight computer holding simulation time.</p>
         <button id="modalAction">RESUME FLIGHT</button>
+        <button id="modalReplay" class="secondary-action hidden">VIEW REPLAY</button>
       </div>
     </div>
 

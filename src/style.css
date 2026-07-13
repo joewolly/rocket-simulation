@@ -36,6 +36,7 @@ body::after { content:""; pointer-events:none; position:fixed; inset:0; backgrou
 .actions { position:fixed; left:50%; right:auto; bottom:22px; translate:-50% 0; display:flex; gap:2px; z-index:3; padding:5px; border:1px solid rgba(210,231,232,.18); background:rgba(4,13,17,.72); box-shadow:0 12px 40px rgba(0,0,0,.28); backdrop-filter:blur(14px); }
 button { border:1px solid rgba(233,238,233,.25); color:var(--paper); background:rgba(5,12,15,.52); padding:9px 12px; font-size:9px; letter-spacing:.08em; cursor:pointer; backdrop-filter:blur(6px); }
 button:hover,button:focus-visible { border-color:var(--orange); color:var(--orange); outline:none; }
+button:disabled { opacity:.32; cursor:not-allowed; }
 kbd { color:var(--muted); font:8px "DM Mono"; margin-left:7px; }
 .hint { position:fixed; left:50%; bottom:94px; translate:-50% 0; padding:8px 13px; color:#a5b3b3; background:rgba(5,12,15,.48); border-left:1px solid var(--orange); font-size:8px; letter-spacing:.09em; z-index:2; transition:opacity 1s; }
 .hint span { color:var(--orange); margin-right:10px; }
@@ -47,6 +48,8 @@ kbd { color:var(--muted); font:8px "DM Mono"; margin-left:7px; }
 .modal h1 { margin:8px 0; font:700 46px/1 "Barlow Condensed"; letter-spacing:.06em; }
 .modal p { color:var(--muted); font-size:11px; line-height:1.7; }
 .modal button { margin-top:12px; border-color:var(--orange); background:var(--orange); color:#0b1113; font-weight:600; }
+.modal .secondary-action { margin-left:6px; color:var(--paper); background:transparent; }
+.modal .secondary-action.hidden { display:none; }
 @media (max-width: 720px) {
   .brand { top:18px; left:18px; font-size:20px; } .mission { top:60px; left:18px; }
   .mission strong { font-size:18px; } .telemetry { top:18px; right:14px; gap:0; }
@@ -84,10 +87,32 @@ kbd { color:var(--muted); font:8px "DM Mono"; margin-left:7px; }
 .flight-tape::after { content:""; position:absolute; right:-3px; top:72%; width:7px; height:7px; rotate:45deg; background:var(--orange); box-shadow:0 0 9px rgba(255,90,31,.7); }
 .reticle { box-shadow:0 0 40px rgba(255,90,31,.07),inset 0 0 20px rgba(255,90,31,.04); }
 .telemetry div { box-shadow:inset 0 1px rgba(255,255,255,.04); }
+.drawer { position:fixed; top:0; right:0; width:min(430px,100%); height:100%; z-index:9; padding:30px; overflow:auto; color:#e9eeee; background:linear-gradient(145deg,rgba(8,18,22,.98),rgba(5,12,15,.97)); border-left:1px solid rgba(255,255,255,.13); box-shadow:-30px 0 80px rgba(0,0,0,.36); backdrop-filter:blur(18px); transition:translate .28s ease,opacity .2s; }
+.drawer.hidden { translate:100% 0; opacity:0; pointer-events:none; }
+.drawer header { display:flex; justify-content:space-between; align-items:start; border-bottom:1px solid rgba(255,255,255,.12); padding-bottom:18px; }
+.drawer h2 { margin:5px 0 0; font:700 31px/1 "Barlow Condensed"; letter-spacing:.04em; }
+.drawer header button { border:0; background:transparent; padding:0; font-size:25px; }
+.drawer > p { color:#8da0a2; font-size:9px; line-height:1.8; margin:18px 0; }
+.mission-list { display:grid; gap:8px; }
+.mission-card { width:100%; text-align:left; display:grid; grid-template-columns:43px 1fr auto; gap:12px; align-items:center; padding:15px; background:rgba(255,255,255,.025); border:1px solid rgba(255,255,255,.1); }
+.mission-card .number { display:grid; place-items:center; width:40px; height:40px; border:1px solid color-mix(in srgb,var(--mission-accent),transparent 55%); color:var(--mission-accent); font:700 17px "Barlow Condensed"; }
+.mission-card strong { display:block; font:600 16px "Barlow Condensed"; letter-spacing:.03em; }
+.mission-card p { margin:4px 0 0; color:#829496; font-size:7px; line-height:1.45; }
+.mission-card small { color:var(--mission-accent); font-size:6px; letter-spacing:.11em; }
+.mission-card em { display:block; margin-top:5px; color:#9caaab; font:normal 7px "DM Mono"; }
+.mission-card.active { background:rgba(255,90,31,.08); border-color:var(--mission-accent); }
+.mission-card.locked { opacity:.48; }
+.drawer footer { display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:7px; margin-top:18px; padding-top:16px; border-top:1px solid rgba(255,255,255,.1); }
+.drawer footer span { color:#708184; font-size:6px; letter-spacing:.1em; }
+.replay-timeline { position:fixed; z-index:5; left:50%; bottom:91px; translate:-50% 0; width:min(520px,calc(100% - 36px)); display:grid; grid-template-columns:auto 1fr auto; align-items:center; gap:12px; padding:9px 12px; background:rgba(4,13,17,.78); border:1px solid rgba(255,255,255,.13); backdrop-filter:blur(10px); transition:opacity .2s; }
+.replay-timeline.hidden { opacity:0; pointer-events:none; }
+.replay-timeline span,.replay-timeline output { color:#8fa0a2; font-size:7px; letter-spacing:.12em; }
+.replay-timeline input { width:100%; accent-color:var(--orange); }
 
 @media (max-width: 900px) {
   .environment,.flight-tape { display:none; }
-  .command-dock button { min-width:58px; }
+  .command-dock button { min-width:48px; }
+  .dock-status { display:none; }
 }
 @media (max-width: 720px) {
   .brand { top:14px; left:14px; } .brand-mark { width:32px; height:32px; }
