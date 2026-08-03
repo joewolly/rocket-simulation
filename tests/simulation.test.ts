@@ -56,7 +56,17 @@ test("replay captures and samples serializable flight state",()=>{
 });
 
 test("persistence falls back to safe defaults when browser storage is unavailable",()=>{
-  assert.deepEqual(loadRecords(),{ bestScores:{}, completed:[], audioEnabled:true, quality:"high" });
+  const original = Object.getOwnPropertyDescriptor(globalThis,"localStorage");
+  Object.defineProperty(globalThis,"localStorage",{
+    configurable:true,
+    value:{ getItem:()=>{ throw new Error("storage unavailable"); } },
+  });
+  try {
+    assert.deepEqual(loadRecords(),{ bestScores:{}, completed:[], audioEnabled:true, quality:"high" });
+  } finally {
+    if(original) Object.defineProperty(globalThis,"localStorage",original);
+    else delete (globalThis as { localStorage?: unknown }).localStorage;
+  }
 });
 
 test("persistence sanitizes malformed browser records",()=>{

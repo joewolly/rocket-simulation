@@ -31,11 +31,11 @@ The simulator adapts from a desktop flight deck to touch controls, with mission 
 
 ## Run locally
 
-Requirements: a modern browser with WebGL enabled and Node.js 20.19 or newer for local development.
+Requirements: a modern browser with WebGL enabled and Node.js `^20.19.0 || >=22.12.0` for local development.
 
 ```bash
 npm install
-npx playwright install chromium  # first time only, for browser tests
+npx playwright install --with-deps chromium  # first time only, for browser tests
 npm run dev
 ```
 
