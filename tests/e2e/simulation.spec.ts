@@ -35,7 +35,7 @@ test("mobile flight controls preserve the playfield",async({page})=>{
 
 test("assisted flight reaches touchdown and exposes replay",async({page})=>{
   test.setTimeout(45_000);
-  await page.goto("/?simSpeed=4");
+  await page.goto("/?simSpeed=6");
   await page.keyboard.press("KeyA");
   await expect(page.locator("#modalTitle")).toHaveText("TOUCHDOWN",{timeout:30_000});
   await expect(page.locator("#replayButton")).toBeEnabled();
