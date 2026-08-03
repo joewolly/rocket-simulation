@@ -2,6 +2,25 @@
 
 An interactive offshore booster-recovery simulator built with Three.js, TypeScript, and Vite. Fly a reusable stage onto the moving drone ship *Odyssey* while managing thrust, angular momentum, wind, fuel, deck motion, and landing-leg contact.
 
+## Screenshots
+
+The simulator adapts from a desktop flight deck to touch controls, with mission selection and flight replay built into the same loop.
+
+<table>
+  <tr>
+    <td><img src="docs/screenshots/desktop-mission-drawer.png" alt="Desktop flight view with the Recovery Missions drawer open" width="640" /></td>
+    <td><img src="docs/screenshots/mobile-flight-controls.png" alt="Mobile flight view with touch controls" width="220" /></td>
+  </tr>
+  <tr>
+    <td align="center">Desktop mission selection</td>
+    <td align="center">Mobile touch controls</td>
+  </tr>
+</table>
+
+<p align="center">
+  <img src="docs/screenshots/touchdown-replay.png" alt="Flight replay timeline after touchdown" width="960" />
+</p>
+
 ## Run locally
 
 ```bash
