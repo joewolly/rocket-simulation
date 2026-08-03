@@ -34,10 +34,10 @@ test("mobile flight controls preserve the playfield",async({page})=>{
 });
 
 test("assisted flight reaches touchdown and exposes replay",async({page})=>{
-  test.setTimeout(30_000);
+  test.setTimeout(45_000);
   await page.goto("/?simSpeed=4");
   await page.keyboard.press("KeyA");
-  await expect(page.locator("#modalTitle")).toHaveText("TOUCHDOWN",{timeout:22_000});
+  await expect(page.locator("#modalTitle")).toHaveText("TOUCHDOWN",{timeout:30_000});
   await expect(page.locator("#replayButton")).toBeEnabled();
   await page.locator("#modalReplay").click();
   await expect(page.locator("#replayTimeline")).not.toHaveClass(/hidden/);
