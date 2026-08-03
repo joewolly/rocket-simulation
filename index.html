@@ -14,7 +14,7 @@
     <aside class="mission">
       <span id="missionNumber" class="eyebrow">MISSION 01</span>
       <strong id="missionTitle">DECK <em>QUALIFICATION</em></strong>
-      <span id="statusText">Approach corridor acquired</span>
+      <span id="statusText" aria-live="polite">Approach corridor acquired</span>
     </aside>
 
     <section class="telemetry" aria-label="Flight telemetry">
@@ -35,7 +35,7 @@
     <div id="callout" class="callout">DECK LOCKED <b>●</b></div>
 
     <section class="throttle-panel">
-      <label>THROTTLE <output id="throttleValue">55%</output></label>
+      <label for="throttle">THROTTLE <output id="throttleValue">55%</output></label>
       <input id="throttle" type="range" min="0" max="100" value="55" aria-label="Engine throttle" />
       <div class="ticks"></div>
     </section>
@@ -81,7 +81,7 @@
       </div>
     </div>
 
-    <div id="modal" class="modal hidden" role="dialog" aria-modal="true">
+    <div id="modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="modalTitle" aria-describedby="modalCopy">
       <div class="modal-card">
         <span id="modalEyebrow" class="eyebrow">MISSION STATUS</span>
         <h1 id="modalTitle">PAUSED</h1>

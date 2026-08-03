@@ -2,6 +2,14 @@
 
 An interactive offshore booster-recovery simulator built with Three.js, TypeScript, and Vite. Fly a reusable stage onto the moving drone ship *Odyssey* while managing thrust, angular momentum, wind, fuel, deck motion, and landing-leg contact.
 
+[![CI](https://github.com/joewolly/rocket-simulation/actions/workflows/ci.yml/badge.svg)](https://github.com/joewolly/rocket-simulation/actions/workflows/ci.yml)
+
+> **Status:** public preview. SEA LEVEL is a playable visual simulator, not a flight-certified engineering or safety-analysis tool.
+
+## What this is
+
+SEA LEVEL keeps the flight rules deterministic and serializable while the Three.js layer renders the vehicle, ocean, weather, and moving deck. It is designed for browser play, control experimentation, and replayable landing challenges. The model intentionally simplifies real launch and recovery operations; do not use its output for vehicle design, operations, or safety decisions.
+
 ## Screenshots
 
 The simulator adapts from a desktop flight deck to touch controls, with mission selection and flight replay built into the same loop.
@@ -23,20 +31,47 @@ The simulator adapts from a desktop flight deck to touch controls, with mission 
 
 ## Run locally
 
+Requirements: a modern browser with WebGL enabled and Node.js 20.19 or newer for local development.
+
 ```bash
 npm install
+npx playwright install chromium  # first time only, for browser tests
 npm run dev
 ```
 
-Production build and verification:
+Open the local URL printed by Vite. For production verification:
 
 ```bash
-npm test
-npm run test:e2e
-npm run build
+npm run verify
+git diff --check
 ```
 
-The Playwright browser must be installed once with `npx playwright install chromium`.
+`npm run verify` runs the deterministic unit suite, desktop/mobile Playwright checks, and the production build. `npm run build` writes the static site to `dist/`; it can be served by any static hosting provider.
+
+## Deploy
+
+Use a static-site deployment with:
+
+- **Build command:** `npm ci && npm run build`
+- **Publish directory:** `dist`
+- **Runtime:** no server or environment secrets required
+
+The npm package is intentionally marked private because SEA LEVEL ships as a static site, not as an npm library.
+
+The app is client-only. A deployment can use a custom domain or a root-path static host. If you deploy under a subpath, configure Vite's `base` option for that path before building and serve the generated `index.html` as the fallback document.
+
+The production build keeps Three.js in a separately cacheable vendor chunk (currently about 523 kB minified / 130 kB gzip). Vite reports that chunk-size warning intentionally; future rendering work should reduce or reassess that cost before adding more large dependencies.
+
+## Maintainer release checklist
+
+- Confirm the repository visibility, branch protection, Issues, and private vulnerability reporting settings on GitHub.
+- Choose a static host and verify the deployed root URL on desktop and touch hardware.
+- Run `npm run verify` and `git diff --check` from the release commit.
+- Tag the release and link the deployed simulator from the GitHub repository description.
+
+## Data and privacy
+
+There are no accounts, project-owned APIs, or server-side pilot records. Mission progress, personal-best scores, audio preference, and graphics preference are stored in the browser under the `sea-level-pilot-records-v2` local-storage key. Clearing site data resets them. Audio starts only after a user gesture and can be muted from the flight dock. The default stylesheet loads display fonts from Google Fonts; deployments that need to be fully self-contained should replace that import with bundled fonts or system fallbacks.
 
 ## Flight systems
 
@@ -59,6 +94,13 @@ The Playwright browser must be installed once with `npx playwright install chrom
 4. **Heavy Sea** — extreme swell, gusting wind, and narrow fuel margin
 
 Complete each mission above its unlock threshold to open the next.
+
+## Known limitations
+
+- The flight and ocean models are intentionally simplified and tuned for a playable experience.
+- Procedural vehicle and ship geometry are the reliable runtime fallback; production GLB assets are not included yet.
+- WebGL is required; devices without a working WebGL context cannot render the simulator.
+- Records are local to one browser profile and are not synchronized between devices.
 
 ## Controls
 
@@ -91,3 +133,7 @@ Complete each mission above its unlock threshold to open the next.
 - `tests/e2e/simulation.spec.ts`: desktop, mobile, WebGL, touchdown, and replay QA
 
 The simulation owns gameplay state independently of Three.js objects. Production vehicle and ship models should be optimized GLB files following [the runtime asset contract](assets/README.md); procedural models remain available as reliable fallbacks.
+
+## Contributing and license
+
+Development, testing, physics-boundary, and pull-request guidance is in [CONTRIBUTING.md](CONTRIBUTING.md). Please read [SECURITY.md](SECURITY.md) before reporting a vulnerability. SEA LEVEL is released under the [MIT License](LICENSE).

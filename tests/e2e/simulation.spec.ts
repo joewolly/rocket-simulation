@@ -8,6 +8,8 @@ test("desktop flight shell, controls, and mission drawer",async({page})=>{
   await expect(page.locator("#scene")).toBeVisible();
   await expect(page.locator(".brand")).toContainText("SEA LEVEL");
   await expect(page.locator("#altitude")).not.toHaveText("--");
+  await expect(page.locator("#modal")).toHaveAttribute("aria-labelledby","modalTitle");
+  await expect(page.locator("#throttle")).toHaveAttribute("aria-label","Engine throttle");
   await page.keyboard.press("KeyA");
   await expect(page.locator("#statusText")).toContainText("Autoland");
   await page.keyboard.press("KeyC"); await page.keyboard.press("KeyC"); await page.keyboard.press("KeyC");
