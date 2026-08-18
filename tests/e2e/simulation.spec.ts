@@ -12,7 +12,7 @@ test("desktop flight shell, controls, and mission drawer",async({page})=>{
   await expect(page.locator("#throttle")).toHaveAttribute("aria-label","Engine throttle");
   await page.keyboard.press("KeyA");
   await expect(page.locator("#statusText")).toContainText("Autoland");
-  await page.keyboard.press("KeyC"); await page.keyboard.press("KeyC"); await page.keyboard.press("KeyC");
+  await page.keyboard.press("KeyC"); await page.keyboard.press("KeyC"); await page.keyboard.press("KeyC"); await page.keyboard.press("KeyC"); await page.keyboard.press("KeyC");
   await expect(page.locator("#cameraButton span")).toHaveText("CHASE");
   await page.locator("#missionButton").click();
   await expect(page.locator("#missionDrawer")).not.toHaveClass(/hidden/);
