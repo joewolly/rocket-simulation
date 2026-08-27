@@ -13,11 +13,12 @@ SEA LEVEL keeps the flight rules deterministic and serializable while the Three.
 ## Screenshots
 
 The simulator adapts from a desktop flight deck to touch controls, with mission selection and flight replay built into the same loop.
+All three shots are captured by the Playwright suite in `tests/e2e/simulation.spec.ts` into `test-results/` and copied into `docs/screenshots/`.
 
 <table>
   <tr>
-    <td><img src="docs/screenshots/desktop-mission-drawer.png" alt="Desktop flight view with the Recovery Missions drawer open" width="640" /></td>
-    <td><img src="docs/screenshots/mobile-flight-controls.png" alt="Mobile flight view with touch controls" width="220" /></td>
+    <td><img src="docs/screenshots/desktop-flight.png" alt="Desktop flight view with the Recovery Missions drawer open" width="640" /></td>
+    <td><img src="docs/screenshots/mobile-flight.png" alt="Mobile flight view with touch controls" width="220" /></td>
   </tr>
   <tr>
     <td align="center">Desktop mission selection</td>
