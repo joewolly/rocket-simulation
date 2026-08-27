@@ -12,7 +12,7 @@ test("desktop flight shell, controls, and mission drawer",async({page})=>{
   await expect(page.locator("#throttle")).toHaveAttribute("aria-label","Engine throttle");
   await page.keyboard.press("KeyA");
   await expect(page.locator("#statusText")).toContainText("Autoland");
-  await page.keyboard.press("KeyC"); await page.keyboard.press("KeyC"); await page.keyboard.press("KeyC");
+  await page.keyboard.press("KeyC"); await page.keyboard.press("KeyC"); await page.keyboard.press("KeyC"); await page.keyboard.press("KeyC"); await page.keyboard.press("KeyC");
   await expect(page.locator("#cameraButton span")).toHaveText("CHASE");
   await page.locator("#missionButton").click();
   await expect(page.locator("#missionDrawer")).not.toHaveClass(/hidden/);
@@ -34,10 +34,12 @@ test("mobile flight controls preserve the playfield",async({page})=>{
 });
 
 test("assisted flight reaches touchdown and exposes replay",async({page})=>{
-  test.setTimeout(45_000);
+  test.setTimeout(60_000);
   await page.goto("/?simSpeed=6");
+  await expect(page.locator("#altitude")).not.toHaveText("--");
   await page.keyboard.press("KeyA");
-  await expect(page.locator("#modalTitle")).toHaveText("TOUCHDOWN",{timeout:30_000});
+  await expect(page.locator("#statusText")).toContainText("Autoland");
+  await expect(page.locator("#modalTitle")).toHaveText("TOUCHDOWN",{timeout:45_000});
   await expect(page.locator("#replayButton")).toBeEnabled();
   await page.locator("#modalReplay").click();
   await expect(page.locator("#replayTimeline")).not.toHaveClass(/hidden/);

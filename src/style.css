@@ -18,12 +18,18 @@ body::after { content:""; pointer-events:none; position:fixed; inset:0; backgrou
 .telemetry div { width:94px; padding:10px 12px 9px; border-top:1px solid rgba(233,238,233,.35); background:rgba(5,12,15,.36); backdrop-filter:blur(6px); }
 .telemetry span { display:block; color:var(--muted); font-size:8px; letter-spacing:.08em; }
 .telemetry strong { font:600 20px/1.2 "Barlow Condensed"; } .telemetry small { margin-left:3px; color:var(--muted); font-size:8px; }
-.reticle { position:fixed; left:50%; top:50%; width:76px; height:76px; translate:-50% -50%; border:1px solid rgba(255,90,31,.45); border-radius:50%; z-index:2; pointer-events:none; }
+.reticle { position:fixed; left:50%; top:50%; width:88px; height:88px; translate:-50% -50%; border:1px solid rgba(255,90,31,.45); border-radius:50%; z-index:2; pointer-events:none; overflow:hidden; }
 .reticle::before,.reticle::after { content:""; position:absolute; background:var(--orange); }
-.reticle::before { left:50%; top:-7px; width:1px; height:14px; box-shadow:0 75px var(--orange); }
-.reticle::after { top:50%; left:-7px; width:14px; height:1px; box-shadow:75px 0 var(--orange); }
-.reticle span { position:absolute; inset:27px; border:1px solid rgba(255,90,31,.65); border-radius:50%; }
+.reticle::before { left:50%; top:-7px; width:1px; height:14px; box-shadow:0 87px var(--orange); }
+.reticle::after { top:50%; left:-7px; width:14px; height:1px; box-shadow:87px 0 var(--orange); }
+.reticle span { position:absolute; inset:31px; border:1px solid rgba(255,90,31,.65); border-radius:50%; }
 .reticle i { position:absolute; width:3px; height:3px; background:var(--orange); top:50%; left:50%; translate:-50% -50%; border-radius:50%; }
+.attitude-horizon { position:absolute; inset:-40px; pointer-events:none; will-change:transform; opacity:.65; }
+.horizon-line { position:absolute; left:0; right:0; top:50%; height:1px; background:rgba(102,224,140,.85); box-shadow:0 0 6px rgba(102,224,140,.6); }
+.pitch-ladder { position:absolute; left:50%; top:50%; translate:-50% -50%; display:flex; flex-direction:column; align-items:center; justify-content:space-between; height:140px; font-size:6px; color:rgba(102,224,140,.75); font-family:"DM Mono", monospace; }
+.pitch-deg { display:inline-block; border-bottom:1px solid rgba(102,224,140,.5); padding:0 3px; }
+.pitch-zero { color:rgba(255,90,31,.85); font-weight:bold; }
+.gimbal-marker { position:absolute; left:50%; top:50%; width:7px; height:7px; translate:-50% -50%; border:1px solid rgba(255,210,140,.9); border-radius:50%; pointer-events:none; transition:transform .04s ease-out; }
 .callout { position:fixed; left:calc(50% + 54px); top:calc(50% + 40px); color:#b8c5c4; font-size:8px; letter-spacing:.08em; z-index:2; transition:opacity .2s; }
 .callout b { color:#66e08c; }
 .throttle-panel { position:fixed; left:32px; bottom:31px; width:230px; z-index:3; }

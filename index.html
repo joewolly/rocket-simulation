@@ -31,7 +31,22 @@
       <div><strong>042°</strong><small>VESSEL HDG</small></div>
     </aside>
 
-    <div class="reticle" aria-hidden="true"><span></span><i></i></div>
+    <div class="reticle" aria-hidden="true">
+      <div id="attitudeHorizon" class="attitude-horizon">
+        <div class="horizon-sky"></div>
+        <div class="horizon-ground"></div>
+        <div class="horizon-line"></div>
+        <div class="pitch-ladder">
+          <span class="pitch-deg">10</span>
+          <span class="pitch-deg">5</span>
+          <span class="pitch-zero">— 0 —</span>
+          <span class="pitch-deg">-5</span>
+          <span class="pitch-deg">-10</span>
+        </div>
+      </div>
+      <div id="gimbalMarker" class="gimbal-marker" title="Thrust Vector Gimbal"></div>
+      <span></span><i></i>
+    </div>
     <div id="callout" class="callout">DECK LOCKED <b>●</b></div>
 
     <section class="throttle-panel">
