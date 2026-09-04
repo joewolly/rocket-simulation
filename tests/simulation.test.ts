@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createFlightState, deckPose, stepFlight, type Controls } from "../src/simulation.ts";
+import { createFlightState, deckHeightAt, deckPose, evaluateLanding, stepFlight, TOUCHDOWN_LIMITS, type Controls } from "../src/simulation.ts";
 import { updateLandingAssist } from "../src/game/autopilot.ts";
 import { MISSIONS } from "../src/game/missions.ts";
 import { loadRecords } from "../src/game/persistence.ts";
@@ -34,6 +34,65 @@ test("sea-state setting scales deck motion",()=>{
   const calm=deckPose(3.4,.5),heavy=deckPose(3.4,2.2);
   assert.ok(Math.abs(heavy.y)>Math.abs(calm.y));
   assert.ok(Math.abs(heavy.roll)>Math.abs(calm.roll));
+});
+
+function diagnosticState() {
+  const state=createFlightState({position:{x:0,y:0,z:0},velocity:{x:0,y:0,z:0},wind:{x:0,z:0,gust:0}});
+  state.tiltX=state.tiltZ=0;
+  state.angularVelocity={x:0,z:0};
+  state.legCompression=[1,0,0,0];
+  return state;
+}
+
+test("landing evaluator reports all touchdown measurements and strict limits",()=>{
+  const state=diagnosticState();
+  const before=structuredClone(state);
+  const evaluation=evaluateLanding(state,1);
+  assert.deepEqual(state,before,"evaluation must not mutate flight state");
+  assert.equal(evaluation.safe,true);
+  assert.equal(evaluation.checks.length,8);
+  assert.deepEqual(evaluation.checks.map((check)=>check.id),[
+    "deckX","deckZ","targetDistance","verticalSpeed","horizontalSpeed","tilt","angularSpeed","contacts",
+  ]);
+  assert.equal(evaluation.measurements.contacts,1);
+  assert.equal(evaluation.checks.at(-1)?.passed,true);
+});
+
+test("landing evaluator rejects each touchdown failure condition at its existing boundary",()=>{
+  const cases:[string,(state:ReturnType<typeof diagnosticState>)=>void][]=[
+    ["deckX",(state)=>{state.position.x=TOUCHDOWN_LIMITS.deckX;}],
+    ["deckZ",(state)=>{state.position.z=TOUCHDOWN_LIMITS.deckZ;}],
+    ["targetDistance",(state)=>{state.position.x=TOUCHDOWN_LIMITS.targetDistance;}],
+    ["verticalSpeed",(state)=>{state.velocity.y=TOUCHDOWN_LIMITS.verticalSpeed;}],
+    ["horizontalSpeed",(state)=>{state.velocity.x=TOUCHDOWN_LIMITS.horizontalSpeed;}],
+    ["tilt",(state)=>{state.tiltX=TOUCHDOWN_LIMITS.tilt;}],
+    ["angularSpeed",(state)=>{state.angularVelocity.x=TOUCHDOWN_LIMITS.angularSpeed;}],
+    ["contacts",(state)=>{}],
+  ];
+  for(const [id,change] of cases){
+    const state=diagnosticState();
+    const contacts=id==="contacts"?0:1;
+    change(state);
+    const evaluation=evaluateLanding(state,contacts);
+    assert.equal(evaluation.checks.find((check)=>check.id===id)?.passed,false,`${id} boundary should fail`);
+    assert.equal(evaluation.safe,false,`${id} boundary should reject touchdown`);
+  }
+});
+
+test("landing diagnostic snapshot preserves contact values before resolution clears motion",()=>{
+  const state=diagnosticState();
+  state.position.y=deckHeightAt(0,0,1/120,state.seaState)+2.9-.15;
+  state.velocity.y=-1;
+  state.throttle=0;
+  stepFlight(state,controls(),1/120);
+  assert.equal(state.phase,"landed");
+  assert.ok(state.touchdownDiagnostic);
+  assert.equal(Object.isFrozen(state.touchdownDiagnostic),true);
+  assert.equal(Object.isFrozen(state.touchdownDiagnostic?.measurements),true);
+  assert.equal(Object.isFrozen(state.touchdownDiagnostic?.checks),true);
+  assert.ok((state.touchdownDiagnostic?.measurements.verticalSpeed ?? 0)>0);
+  assert.deepEqual(JSON.parse(JSON.stringify(state.touchdownDiagnostic)),state.touchdownDiagnostic);
+  assert.deepEqual(state.velocity,{x:0,y:0,z:0});
 });
 
 test("landing assist completes every mission",()=>{

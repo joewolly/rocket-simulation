@@ -46,6 +46,7 @@ export interface FlightState {
   touchdownScore: number;
   touchdownVerticalSpeed: number;
   touchdownDrift: number;
+  touchdownDiagnostic: LandingEvaluation | null;
   maxTilt: number;
   maxStress: number;
   missionId: string;
@@ -54,8 +55,60 @@ export interface FlightState {
   scoreMultiplier: number;
 }
 
+export type LandingCheckId =
+  | "deckX"
+  | "deckZ"
+  | "targetDistance"
+  | "verticalSpeed"
+  | "horizontalSpeed"
+  | "tilt"
+  | "angularSpeed"
+  | "contacts";
+
+export type LandingCheckComparison = "less-than" | "at-least";
+
+export interface LandingCheck {
+  readonly id: LandingCheckId;
+  readonly label: string;
+  readonly measured: number;
+  readonly limit: number;
+  readonly unit: "m" | "m/s" | "rad" | "rad/s" | "legs";
+  readonly comparison: LandingCheckComparison;
+  readonly passed: boolean;
+}
+
+export interface LandingMeasurements {
+  readonly positionX: number;
+  readonly positionZ: number;
+  readonly onDeck: boolean;
+  readonly positionAligned: boolean;
+  readonly targetDistance: number;
+  readonly verticalSpeed: number;
+  readonly horizontalSpeed: number;
+  readonly tilt: number;
+  readonly angularSpeed: number;
+  readonly contacts: number;
+}
+
+export interface LandingEvaluation {
+  readonly safe: boolean;
+  readonly positionAligned: boolean;
+  readonly measurements: LandingMeasurements;
+  readonly checks: readonly LandingCheck[];
+}
+
 export const ROCKET_HALF_HEIGHT = 2.9;
 export const DECK_CENTER_Z = 0;
+export const TOUCHDOWN_LIMITS = Object.freeze({
+  deckX: 6.7,
+  deckZ: 15.5,
+  targetDistance: 4.5,
+  verticalSpeed: 3.1,
+  horizontalSpeed: 2.1,
+  tilt: 0.14,
+  angularSpeed: 0.17,
+  minimumContacts: 1,
+} as const);
 const DRY_MASS = 25_600;
 const PROPELLANT_MASS = 9_400;
 
@@ -84,6 +137,7 @@ export function createFlightState(init: FlightInit = {}): FlightState {
     touchdownScore: 0,
     touchdownVerticalSpeed: 0,
     touchdownDrift: 0,
+    touchdownDiagnostic: null,
     maxTilt: 0,
     maxStress: 0,
     missionId: init.missionId ?? "qualification",
@@ -91,6 +145,72 @@ export function createFlightState(init: FlightInit = {}): FlightState {
     gravity: init.gravity ?? 9.81,
     scoreMultiplier: init.scoreMultiplier ?? 1,
   };
+}
+
+export function evaluateLanding(state: FlightState, contacts?: number): LandingEvaluation {
+  const measuredContacts = contacts ?? state.legCompression.filter((compression) => compression > 0).length;
+  const positionX = Math.abs(state.position.x);
+  const positionZ = Math.abs(state.position.z);
+  const targetDistance = Math.hypot(state.position.x, state.position.z);
+  const verticalSpeed = Math.abs(state.velocity.y);
+  const horizontalSpeed = Math.hypot(state.velocity.x, state.velocity.z);
+  const tilt = Math.max(Math.abs(state.tiltX), Math.abs(state.tiltZ));
+  const angularSpeed = Math.hypot(state.angularVelocity.x, state.angularVelocity.z);
+  const onDeck = positionX < TOUCHDOWN_LIMITS.deckX && positionZ < TOUCHDOWN_LIMITS.deckZ;
+  const checks: LandingCheck[] = [
+    landingCheck("deckX", "Deck X position", positionX, TOUCHDOWN_LIMITS.deckX, "m", "less-than"),
+    landingCheck("deckZ", "Deck Z position", positionZ, TOUCHDOWN_LIMITS.deckZ, "m", "less-than"),
+    landingCheck("targetDistance", "Target distance", targetDistance, TOUCHDOWN_LIMITS.targetDistance, "m", "less-than"),
+    landingCheck("verticalSpeed", "Vertical speed", verticalSpeed, TOUCHDOWN_LIMITS.verticalSpeed, "m/s", "less-than"),
+    landingCheck("horizontalSpeed", "Lateral drift", horizontalSpeed, TOUCHDOWN_LIMITS.horizontalSpeed, "m/s", "less-than"),
+    landingCheck("tilt", "Tilt", tilt, TOUCHDOWN_LIMITS.tilt, "rad", "less-than"),
+    landingCheck("angularSpeed", "Angular rate", angularSpeed, TOUCHDOWN_LIMITS.angularSpeed, "rad/s", "less-than"),
+    landingCheck("contacts", "Leg contacts", measuredContacts, TOUCHDOWN_LIMITS.minimumContacts, "legs", "at-least"),
+  ];
+  const positionAligned = onDeck && targetDistance < TOUCHDOWN_LIMITS.targetDistance;
+  return {
+    safe: checks.every((check) => check.passed),
+    positionAligned,
+    measurements: {
+      positionX,
+      positionZ,
+      onDeck,
+      positionAligned,
+      targetDistance,
+      verticalSpeed,
+      horizontalSpeed,
+      tilt,
+      angularSpeed,
+      contacts: measuredContacts,
+    },
+    checks,
+  };
+}
+
+function landingCheck(
+  id: LandingCheckId,
+  label: string,
+  measured: number,
+  limit: number,
+  unit: LandingCheck["unit"],
+  comparison: LandingCheckComparison,
+): LandingCheck {
+  return {
+    id,
+    label,
+    measured,
+    limit,
+    unit,
+    comparison,
+    passed: comparison === "at-least" ? measured >= limit : measured < limit,
+  };
+}
+
+function freezeLandingEvaluation(evaluation: LandingEvaluation): LandingEvaluation {
+  evaluation.checks.forEach((check) => Object.freeze(check));
+  Object.freeze(evaluation.checks);
+  Object.freeze(evaluation.measurements);
+  return Object.freeze(evaluation);
 }
 
 export function deckPose(time: number, seaState = 1) {
@@ -205,23 +325,18 @@ function updateLegContacts(state: FlightState) {
 }
 
 function resolveContact(state: FlightState, deckY: number, contacts: number) {
-  const onDeck = Math.abs(state.position.x) < 6.7 && Math.abs(state.position.z) < 15.5;
-  const targetDistance = Math.hypot(state.position.x, state.position.z);
-  const horizontalSpeed = Math.hypot(state.velocity.x, state.velocity.z);
-  const verticalSpeed = Math.abs(state.velocity.y);
-  const tilt = Math.max(Math.abs(state.tiltX), Math.abs(state.tiltZ));
-  const angularSpeed = Math.hypot(state.angularVelocity.x, state.angularVelocity.z);
-  const safe = onDeck && targetDistance < 4.5 && verticalSpeed < 3.1 && horizontalSpeed < 2.1 && tilt < 0.14 && angularSpeed < 0.17 && contacts >= 1;
+  const evaluation = freezeLandingEvaluation(evaluateLanding(state, contacts));
 
-  state.touchdownVerticalSpeed = verticalSpeed;
-  state.touchdownDrift = horizontalSpeed;
+  state.touchdownDiagnostic = evaluation;
+  state.touchdownVerticalSpeed = evaluation.measurements.verticalSpeed;
+  state.touchdownDrift = evaluation.measurements.horizontalSpeed;
   state.position.y = Math.max(state.position.y, deckY + ROCKET_HALF_HEIGHT);
-  state.phase = safe ? "landed" : "crashed";
-  state.touchdownScore = safe
-    ? Math.max(0, Math.round((100 - targetDistance * 8 - verticalSpeed * 7 - horizontalSpeed * 6 - tilt * 100 - angularSpeed * 35) * state.scoreMultiplier))
+  state.phase = evaluation.safe ? "landed" : "crashed";
+  state.touchdownScore = evaluation.safe
+    ? Math.max(0, Math.round((100 - evaluation.measurements.targetDistance * 8 - evaluation.measurements.verticalSpeed * 7 - evaluation.measurements.horizontalSpeed * 6 - evaluation.measurements.tilt * 100 - evaluation.measurements.angularSpeed * 35) * state.scoreMultiplier))
     : 0;
   state.velocity = { x: 0, y: 0, z: 0 };
-  if (safe) {
+  if (evaluation.safe) {
     state.angularVelocity = { x: 0, z: 0 };
     state.gimbal = { x: 0, z: 0 };
     state.tiltX = 0;

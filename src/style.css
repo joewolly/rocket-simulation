@@ -124,3 +124,57 @@ kbd { color:var(--muted); font:8px "DM Mono"; margin-left:7px; }
   .brand { top:14px; left:14px; } .brand-mark { width:32px; height:32px; }
   .actions { display:none; }
 }
+
+/* Flight access and feedback */
+.flight-menu-button,.command-dock .close-flight-menu { display:none; }
+#driftArrow { display:inline-block; margin-left:5px; color:var(--paper); font-style:normal; }
+.modal.hidden,.drawer.hidden,.replay-timeline.hidden { visibility:hidden; }
+.modal-card { width:min(510px,calc(100% - 32px)); max-height:calc(100dvh - 32px); overflow:auto; }
+.landing-debrief { text-align:left; font-size:11px; }
+.landing-debrief .next-attempt { border-left:2px solid var(--orange); padding:8px 12px; background:#152226; color:var(--paper); }
+.landing-debrief details { margin-top:12px; }
+.landing-debrief summary { cursor:pointer; padding:10px 0; color:var(--paper); }
+.landing-debrief table { width:100%; border-collapse:collapse; font-size:10px; }
+.landing-debrief th,.landing-debrief td { padding:8px 4px; border-bottom:1px solid #26373b; text-align:left; }
+.landing-debrief th { color:#b6c6c8; font-weight:400; }
+.landing-debrief tr[data-passed="false"] td:first-child { color:#ff976f; }
+.landing-debrief .score-explanation { font-size:10px; }
+#touchThrottle { display:block; text-align:center; font-size:12px; color:var(--orange); background:#071014d9; padding:6px 2px; }
+.touch-controls button { touch-action:none; }
+.mission > span:last-child { max-width:310px; color:#c5d2d3; text-shadow:0 1px 4px #000; }
+@media (max-width:720px) {
+  .brand { top:max(12px,env(safe-area-inset-top)); left:max(14px,env(safe-area-inset-left)); font-size:17px; }
+  .brand small { display:none; }
+  .mission { top:62px; left:14px; right:14px; }
+  .mission > span:last-child { max-width:100%; font-size:9px; }
+  .telemetry { top:112px; left:14px; right:14px; justify-content:space-between; gap:3px; }
+  .telemetry div,.telemetry div:nth-child(4) { display:block; width:auto; flex:1; padding:7px 6px; background:#071014c9; }
+  .telemetry span { color:#b8c8ca; font-size:8px; }
+  .telemetry strong { font-size:18px; }
+  .flight-menu-button { display:block; position:fixed; top:max(12px,env(safe-area-inset-top)); right:max(14px,env(safe-area-inset-right)); min-height:44px; z-index:5; background:#071014df; }
+  .actions.menu-open { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); left:50%; top:50%; bottom:auto; width:min(340px,calc(100% - 32px)); max-height:calc(100dvh - 32px); overflow:auto; translate:-50% -50%; z-index:10; padding:12px; background:#0b171bf5; box-shadow:0 0 0 100vmax #02080abf; }
+  .command-dock.menu-open::before { display:none; }
+  .command-dock .close-flight-menu { display:block; grid-column:1 / -1; text-align:right; height:44px; }
+  .command-dock.menu-open button { height:52px; border:1px solid #34464a; }
+  .command-dock.menu-open button span { font-size:10px; color:#cad7d8; }
+  .command-dock.menu-open kbd { display:none; }
+  .touch-controls { left:max(14px,env(safe-area-inset-left)); right:max(14px,env(safe-area-inset-right)); }
+  .reticle { width:64px; height:64px; opacity:.65; }
+  .drawer { padding: max(20px,env(safe-area-inset-top)) 18px max(20px,env(safe-area-inset-bottom)); }
+  .drawer header button { min-width:44px; min-height:44px; }
+  .mission-card { padding:12px; gap:9px; }
+  .mission-card p { font-size:9px; }
+  .mission-card em { font-size:8px; }
+  .replay-timeline { bottom:calc(max(18px,env(safe-area-inset-bottom)) + 162px); }
+  .modal-card { padding:20px; }
+  .modal h1 { font-size:36px; }
+}
+@media (max-width:720px) and (max-height:500px) {
+  .brand,.mission .eyebrow { display:none; }
+  .mission { top:10px; right:150px; }
+  .telemetry { top:58px; right:150px; }
+  .actions.menu-open { grid-template-columns:repeat(4,minmax(0,1fr)); width:calc(100% - 32px); }
+  .command-dock .close-flight-menu { grid-column:1 / -1; }
+}
+
+.landing-debrief caption { text-align:left; color:#b6c6c8; font-size:9px; padding:4px 0 8px; }

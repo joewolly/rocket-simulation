@@ -4,13 +4,17 @@ import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
 import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
 import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
 import "./style.css";
-import { createFlightState, deckHeightAt, deckPose, ROCKET_HALF_HEIGHT, stepFlight, type Controls } from "./simulation";
-import { MISSIONS, missionById, type MissionDefinition } from "./game/missions";
+import { createFlightState, deckHeightAt, deckPose, ROCKET_HALF_HEIGHT, stepFlight, TOUCHDOWN_LIMITS, type Controls } from "./simulation";
+import { MISSIONS, type MissionDefinition } from "./game/missions";
 import { FlightAudio } from "./game/audio";
 import { updateLandingAssist } from "./game/autopilot";
 import { pollGamepad, pulseGamepad } from "./game/input";
 import { loadRecords, recordLanding, saveRecords } from "./game/persistence";
 import { applyReplayState, ReplayRecorder } from "./game/replay";
+import { getLandingReadiness, getLandingDebrief } from "./game/landingFeedback";
+import { renderLandingDebrief } from "./ui/landingDebrief";
+import { createOverlayManager } from "./ui/overlay";
+import { lateralMotionAngle, portraitChaseFrame } from "./render/flightFraming";
 
 const canvas = document.querySelector<HTMLCanvasElement>("#scene")!;
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: "high-performance" });
@@ -103,6 +107,11 @@ let replaying = false;
 let replayTime = 0;
 let drawerOpen = false;
 let rateMode = false;
+let flightMenuOpen = false;
+let pausedBeforePanel = false;
+let endTimer: number | undefined;
+const overlay = createOverlayManager();
+const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)");
 const fixedDt = 1 / 120;
 const simulationRate = import.meta.env.DEV ? Math.max(1, Math.min(6, Number(new URLSearchParams(location.search).get("simSpeed")) || 1)) : 1;
 
@@ -110,6 +119,12 @@ let engineThermalHeat = 0;
 
 const ui = {
   altitude: text("altitude"),
+  verticalDirection: text("verticalDirection"),
+  driftArrow: text("driftArrow"),
+  touchThrottle: text("touchThrottle"),
+  flightMenuButton: text("flightMenuButton"),
+  flightActions: text("flightActions"),
+  closeFlightMenu: text("closeFlightMenu"),
   velocity: text("velocity"),
   fuel: text("fuel"),
   drift: text("drift"),
@@ -170,14 +185,14 @@ renderer.setAnimationLoop(frame);
 function frame(now: number) {
   const elapsed = Math.min((now - previousTime) / 1000, 0.05);
   previousTime = now;
-  const pad = pollGamepad(controls);
+  const pad = pollGamepad(flightInputBlocked() ? { ...controls } : controls);
   ui.gamepadStatus.textContent = pad.connected ? "GAMEPAD: CONNECTED" : "GAMEPAD: NOT DETECTED";
   if (replaying && !paused) {
     replayTime = Math.min(recorder.duration, replayTime + elapsed);
     const sample = recorder.sample(replayTime);
     if (sample) applyReplayState(state, sample);
     if (replayTime >= recorder.duration) paused = true;
-  } else if (!paused) {
+  } else if (!paused && !flightInputBlocked()) {
     accumulator += elapsed * simulationRate;
     while (accumulator >= fixedDt) {
       applyLandingAssist();
@@ -259,7 +274,7 @@ function updateWorld(visualTime: number, dt: number) {
   water.uniforms.uSeaState.value = state.seaState;
 
   // Camera Management
-  orbit.enabled = cameraMode === 2 && !paused;
+  orbit.enabled = cameraMode === 2 && !interactionBlocked();
   const desired = new THREE.Vector3();
   const target = new THREE.Vector3();
 
@@ -267,6 +282,11 @@ function updateWorld(visualTime: number, dt: number) {
     // CHASE
     desired.set(state.position.x + 23, state.position.y + 12, state.position.z + 29);
     target.set(state.position.x * 0.35, Math.max(3, state.position.y - 7), state.position.z * 0.25);
+    if (camera.aspect < 1) {
+      const frame = portraitChaseFrame(state.position, camera.aspect, camera.fov);
+      desired.copy(frame.desired);
+      target.copy(frame.target);
+    }
   } else if (cameraMode === 1) {
     // DECK VIEW
     desired.set(-22, 11, 28);
@@ -288,7 +308,7 @@ function updateWorld(visualTime: number, dt: number) {
   if (cameraMode !== 2) {
     const ease = cameraMode === 3 ? 1 - Math.exp(-dt * 18) : 1 - Math.exp(-dt * 2.8);
     camera.position.lerp(desired, ease);
-    if (state.phase === "flying" && state.throttle > 0.35) {
+    if (!reducedMotion.matches && state.phase === "flying" && state.throttle > 0.35) {
       const shake = (state.throttle * 0.024 + state.stress * 0.015) * (cameraMode === 3 ? 1.8 : 1);
       camera.position.x += Math.sin(visualTime * 47) * shake;
       camera.position.y += Math.sin(visualTime * 53) * shake;
@@ -305,7 +325,9 @@ function updateWorld(visualTime: number, dt: number) {
       recordLanding(records, state.missionId, state.touchdownScore);
       renderMissionList();
     }
-    window.setTimeout(showEndState, 500);
+    endTimer = window.setTimeout(() => {
+      if (state.phase !== "flying" && !replaying && !drawerOpen && !flightMenuOpen) showEndState();
+    }, 500);
   }
 }
 
@@ -1421,9 +1443,13 @@ function updateUi() {
   const drift = Math.hypot(state.velocity.x, state.velocity.z);
   ui.altitude.textContent = altitude.toFixed(1).padStart(4, "0");
   ui.velocity.textContent = Math.abs(state.velocity.y).toFixed(1);
-  ui.velocity.style.color = Math.abs(state.velocity.y) > 3.1 && altitude < 10 ? "#ff5a1f" : "";
+  ui.verticalDirection.textContent = state.velocity.y > .05 ? "CLIMB" : state.velocity.y < -.05 ? "DESCENT" : "VERT SPEED";
+  ui.velocity.setAttribute("aria-label", `${ui.verticalDirection.textContent} ${Math.abs(state.velocity.y).toFixed(1)} meters per second`);
+  ui.velocity.style.color = Math.abs(state.velocity.y) >= TOUCHDOWN_LIMITS.verticalSpeed && altitude < 10 ? "#ff5a1f" : "";
   ui.fuel.textContent = Math.round(state.fuel * 100).toString();
   ui.drift.textContent = drift.toFixed(1);
+  ui.driftArrow.style.rotate = `${lateralMotionAngle(state.velocity, camera)}deg`;
+  ui.driftArrow.style.visibility = drift > .05 ? "visible" : "hidden";
   const windSpeed = Math.hypot(state.wind.currentX, state.wind.currentZ);
   ui.windValue.textContent = windSpeed.toFixed(1);
   ui.windArrow.style.rotate = `${(Math.atan2(state.wind.currentX, -state.wind.currentZ) * 180) / Math.PI}deg`;
@@ -1431,17 +1457,14 @@ function updateUi() {
   const percent = Math.round(state.throttle * 100);
   ui.throttle.value = percent.toString();
   ui.throttleValue.textContent = `${percent}%`;
+  ui.touchThrottle.textContent = `${percent}%`;
   ui.throttle.style.setProperty("--fill", `${percent}%`);
-  const targetDistance = Math.hypot(state.position.x, state.position.z);
-  ui.callout.innerHTML = targetDistance < 5 ? "DECK LOCKED <b>●</b>" : "ALIGN WITH TARGET <b>◆</b>";
-  if (state.phase === "flying")
-    ui.status.textContent = assistEnabled
-      ? "Autoland guidance engaged"
-      : altitude < 8
-      ? "Touchdown checks active"
-      : targetDistance < 6
-      ? "Landing solution nominal"
-      : "Correct lateral drift";
+  const feedback = getLandingReadiness(state);
+  ui.callout.textContent = feedback.positionAligned ? "POSITION ALIGNED" : "ALIGN WITH TARGET";
+  if (state.phase === "flying") {
+    const cue = feedback.failureReasons.length ? feedback.correctiveTip : "Approach values within limits · contact still required";
+    ui.status.textContent = `${assistEnabled ? "Autoland · " : ""}${cue}`;
+  }
   if (replaying) {
     ui.status.textContent = "Flight replay telemetry";
     ui.replayScrubber.value = String(recorder.duration ? (replayTime / recorder.duration) * 100 : 0);
@@ -1481,6 +1504,25 @@ function bindInputs() {
   };
   window.addEventListener("keydown", (event) => {
     void flightAudio.unlock();
+    const editing = (event.target as HTMLElement).closest("input, button, summary");
+    if (editing && ["Space", "Enter"].includes(event.code)) return;
+    if ((event.target as HTMLElement).matches("input") && event.code.startsWith("Arrow")) return;
+    if (event.code === "Escape" || event.code === "KeyP") {
+      event.preventDefault();
+      if (event.repeat) return;
+      if (flightMenuOpen) toggleFlightMenu();
+      else if (drawerOpen) toggleMissionDrawer();
+      else if (ui.modalTitle.textContent !== "RENDERER PAUSED") togglePause();
+      return;
+    }
+    if (replaying && !drawerOpen && !flightMenuOpen && ui.modal.classList.contains("hidden") && !event.repeat) {
+      if (event.code === "KeyV") { toggleReplay(); return; }
+      if (event.code === "KeyC") { changeCamera(); return; }
+    }
+    if (flightInputBlocked()) {
+      if (event.code === "KeyM" && drawerOpen && !event.repeat) toggleMissionDrawer();
+      return;
+    }
     const control = keyMap[event.code];
     if (control) {
       setAssist(false);
@@ -1493,7 +1535,6 @@ function bindInputs() {
     if (!event.repeat && event.code === "KeyV") toggleReplay();
     if (!event.repeat && event.code === "KeyU") toggleAudio();
     if (!event.repeat && event.code === "KeyZ") toggleStabilityMode();
-    if (!event.repeat && (event.code === "KeyP" || event.code === "Escape")) togglePause();
     if (!event.repeat && event.code === "KeyR") resetFlight();
   });
   window.addEventListener("keyup", (event) => {
@@ -1501,9 +1542,17 @@ function bindInputs() {
     if (control) controls[control] = false;
   });
   ui.throttle.addEventListener("input", () => {
+    if (flightInputBlocked()) return;
     setAssist(false);
     state.throttle = Number(ui.throttle.value) / 100;
   });
+  ui.flightMenuButton.addEventListener("click", toggleFlightMenu);
+  ui.closeFlightMenu.addEventListener("click", toggleFlightMenu);
+  // Close the mobile panel before dispatching the existing action handlers.
+  ui.flightActions.addEventListener("click", event => {
+    const button = (event.target as HTMLElement).closest("button");
+    if (flightMenuOpen && button && button !== ui.closeFlightMenu && !(button as HTMLButtonElement).disabled) closeFlightMenu();
+  }, true);
   document.querySelector("#cameraButton")!.addEventListener("click", changeCamera);
   ui.autoButton.addEventListener("click", () => setAssist(!assistEnabled));
   ui.missionButton.addEventListener("click", toggleMissionDrawer);
@@ -1514,7 +1563,11 @@ function bindInputs() {
   ui.stabilityButton.addEventListener("click", toggleStabilityMode);
   document.querySelector("#pauseButton")!.addEventListener("click", () => togglePause());
   document.querySelector("#restartButton")!.addEventListener("click", () => resetFlight());
-  ui.modalAction.addEventListener("click", () => (state.phase === "flying" ? togglePause(false) : resetFlight()));
+  ui.modalAction.addEventListener("click", () => {
+    if (ui.modalTitle.textContent === "RENDERER PAUSED") return;
+    if (replaying || state.phase === "flying") togglePause(false);
+    else resetFlight();
+  });
   ui.modalReplay.addEventListener("click", toggleReplay);
   ui.replayScrubber.addEventListener("input", () => {
     replayTime = (Number(ui.replayScrubber.value) / 100) * recorder.duration;
@@ -1525,6 +1578,7 @@ function bindInputs() {
   document.querySelectorAll<HTMLButtonElement>("[data-control]").forEach((button) => {
     const name = button.dataset.control as DigitalControl;
     const set = (value: boolean) => {
+      if (value && flightInputBlocked()) return;
       if (value) setAssist(false);
       controls[name] = value;
     };
@@ -1534,7 +1588,9 @@ function bindInputs() {
     });
     button.addEventListener("pointerup", () => set(false));
     button.addEventListener("pointercancel", () => set(false));
+    button.addEventListener("lostpointercapture", () => set(false));
   });
+  window.addEventListener("blur", clearFlightControls);
   window.setTimeout(() => document.querySelector("#hint")?.classList.add("hidden-hint"), 7000);
 }
 
@@ -1599,14 +1655,57 @@ function applyMissionPresentation() {
   } catch {}
 }
 
+function interactionBlocked() {
+  return paused || drawerOpen || flightMenuOpen || !ui.modal.classList.contains("hidden");
+}
+
+function flightInputBlocked() {
+  return interactionBlocked() || replaying;
+}
+
+function clearFlightControls() {
+  controls.forward = controls.back = controls.left = controls.right = controls.throttleUp = controls.throttleDown = false;
+  controls.pitchAxis = controls.rollAxis = controls.throttleAxis = undefined;
+  controls.assistTiltX = controls.assistTiltZ = controls.assistThrottle = undefined;
+}
+
+function toggleFlightMenu() {
+  if (flightMenuOpen) { closeFlightMenu(); return; }
+  pausedBeforePanel = paused;
+  flightMenuOpen = true;
+  setPaused(true);
+  ui.pauseButton.querySelector("span")!.textContent = pausedBeforePanel ? "RESUME" : "PAUSE";
+  ui.flightActions.classList.add("menu-open");
+  ui.flightActions.setAttribute("role", "dialog");
+  ui.flightActions.setAttribute("aria-modal", "true");
+  ui.flightMenuButton.setAttribute("aria-expanded", "true");
+  overlay.set(ui.flightActions);
+}
+
+function closeFlightMenu() {
+  flightMenuOpen = false;
+  ui.flightActions.classList.remove("menu-open");
+  ui.flightActions.removeAttribute("role");
+  ui.flightActions.removeAttribute("aria-modal");
+  ui.flightMenuButton.setAttribute("aria-expanded", "false");
+  setPaused(pausedBeforePanel);
+  overlay.set(null);
+  if (state.phase !== "flying" && !replaying) showEndState();
+}
+
 function toggleMissionDrawer() {
   drawerOpen = !drawerOpen;
   ui.missionDrawer.classList.toggle("hidden", !drawerOpen);
   if (drawerOpen) {
-    paused = true;
-    orbit.enabled = false;
+    pausedBeforePanel = paused;
+    setPaused(true);
     hideModal();
-  } else if (state.phase === "flying") paused = false;
+    overlay.set(ui.missionDrawer);
+  } else {
+    setPaused(pausedBeforePanel);
+    overlay.set(null);
+    if (state.phase !== "flying" && !replaying) showEndState();
+  }
 }
 
 function toggleReplay() {
@@ -1626,6 +1725,7 @@ function toggleReplay() {
   hideModal();
   ui.replayTimeline.classList.remove("hidden");
   ui.replayButton.classList.add("active");
+  ui.replayButton.querySelector("span")!.textContent = "EXIT REPLAY";
   const sample = recorder.sample(0);
   if (sample) applyReplayState(state, sample);
 }
@@ -1671,6 +1771,7 @@ function changeCamera() {
 function setAssist(value: boolean) {
   assistEnabled = value && state.phase === "flying";
   ui.autoButton.classList.toggle("active", assistEnabled);
+  ui.autoButton.setAttribute("aria-pressed", String(assistEnabled));
   controls.assistTiltX = controls.assistTiltZ = controls.assistThrottle = undefined;
   controls.rateMode = assistEnabled ? false : rateMode;
 }
@@ -1690,14 +1791,20 @@ function togglePause(force?: boolean) {
 
 function setPaused(value: boolean) {
   paused = value;
+  if (value) clearFlightControls();
+  accumulator = 0;
   const label = ui.pauseButton.querySelector("span");
   if (label) label.textContent = value ? "RESUME" : "PAUSE";
-  orbit.enabled = cameraMode === 2 && !value;
+  orbit.enabled = cameraMode === 2 && !interactionBlocked();
 }
 
 function resetFlight(clearReplay = true) {
+  clearTimeout(endTimer);
+  clearFlightControls();
+  drawerOpen = false;
+  ui.missionDrawer.classList.add("hidden");
   state = createFlightState(currentMission.init);
-  paused = false;
+  setPaused(false);
   endShown = false;
   accumulator = 0;
   replaying = false;
@@ -1706,6 +1813,7 @@ function resetFlight(clearReplay = true) {
   hideModal();
   ui.replayTimeline.classList.add("hidden");
   ui.replayButton.classList.remove("active");
+  ui.replayButton.querySelector("span")!.textContent = "REPLAY";
   if (clearReplay) {
     recorder.reset();
     ui.replayButton.disabled = true;
@@ -1713,34 +1821,33 @@ function resetFlight(clearReplay = true) {
 }
 
 function showEndState() {
-  if (state.phase === "landed")
-    showModal(
-      "TOUCHDOWN",
-      `Odyssey secured. Score ${state.touchdownScore}. Vertical ${state.touchdownVerticalSpeed.toFixed(1)} m/s · drift ${state.touchdownDrift.toFixed(1)} m/s.`,
-      "FLY AGAIN",
-      "MISSION COMPLETE"
-    );
-  else
-    showModal(
-      "VEHICLE LOST",
-      `Touchdown limits exceeded. Peak tilt ${((state.maxTilt * 180) / Math.PI).toFixed(1)}° · structural load ${state.maxStress.toFixed(1)}.`,
-      "RETRY APPROACH",
-      "MISSION FAILED"
-    );
+  const feedback = getLandingDebrief(state);
+  const landed = state.phase === "landed";
+  showModal(
+    landed ? "TOUCHDOWN" : "VEHICLE LOST",
+    landed ? `Odyssey secured. Score ${state.touchdownScore}. ${feedback.summary}` : feedback.failureReasons.join(" "),
+    landed ? "FLY AGAIN" : "RETRY APPROACH",
+    landed ? "MISSION COMPLETE" : "MISSION FAILED"
+  );
+  renderLandingDebrief(text("landingDebrief"), feedback);
   ui.modalReplay.classList.toggle("hidden", !recorder.hasReplay);
 }
 
 function showModal(title: string, copy: string, action: string, eyebrow: string) {
+  clearFlightControls();
+  text("landingDebrief").hidden = true;
   ui.modalTitle.textContent = title;
   ui.modalCopy.textContent = copy;
   ui.modalAction.textContent = action;
   ui.modalEyebrow.textContent = eyebrow;
   ui.modalReplay.classList.add("hidden");
   ui.modal.classList.remove("hidden");
+  overlay.set(ui.modal);
 }
 
 function hideModal() {
   ui.modal.classList.add("hidden");
+  overlay.set(null);
 }
 
 function formatTime(seconds: number) {
@@ -1750,10 +1857,16 @@ function formatTime(seconds: number) {
 }
 
 function resize() {
+  if (innerWidth > 720 && flightMenuOpen) closeFlightMenu();
   const w = innerWidth,
     h = innerHeight;
   camera.aspect = w / h;
   camera.updateProjectionMatrix();
+  if (cameraMode === 0 && camera.aspect < 1) {
+    const framing = portraitChaseFrame(state.position, camera.aspect, camera.fov);
+    camera.position.copy(framing.desired);
+    camera.lookAt(framing.target);
+  }
   renderer.setSize(w, h, false);
   composer.setSize(w, h);
   bloom.setSize(w, h);

@@ -87,6 +87,14 @@ There are no accounts, project-owned APIs, or server-side pilot records. Mission
 - Saved mission progression and personal best scores
 - High/low graphics modes and responsive touch controls
 
+## Landing feedback
+
+The flight HUD distinguishes climb from descent and shows lateral drift with a camera-relative motion arrow. Mobile keeps drift and throttle visible, and portrait chase view frames the booster and landing deck together. Live approach cues use the same thresholds as touchdown resolution; they describe current conditions, not a guaranteed future landing.
+
+After contact, the debrief identifies failed checks and suggests one correction for the next attempt. Expand **Contact checks & score breakdown** to compare captured values with the limits and see how a successful landing score was calculated. The snapshot is captured before touchdown clears vehicle motion. Existing scores, mission unlocks, and browser records are preserved. Camera shake respects reduced-motion preferences.
+
+The implementation sequence and acceptance gates are in [the milestone plan](docs/implementation-plan.md).
+
 ## Missions
 
 1. **Deck Qualification** — calm-water training approach
@@ -110,7 +118,7 @@ Complete each mission above its unlock threshold to open the next.
 - `Space` / `Left Shift`: alternate throttle controls
 - `A`: toggle autonomous landing assist
 - `Z`: switch attitude-hold/direct-rate control
-- `C`: cycle chase, deck, and free-orbit cameras
+- `C`: cycle chase, deck, free-orbit, octaweb, and barge cameras
 - Drag and scroll in orbit camera mode
 - `M`: mission and graphics panel
 - `V`: replay the most recent flight
@@ -118,7 +126,8 @@ Complete each mission above its unlock threshold to open the next.
 - `P` or `Escape`: pause/resume
 - `R`: restart the approach
 - Gamepad: left stick for pitch/roll and triggers for analog throttle
-- Touch devices: on-screen flight pad and throttle buttons
+- Touch devices: on-screen flight pad and throttle buttons; **FLIGHT MENU** opens missions, camera, assist, replay, audio, pause, and reset.
+- The flight menu pauses the approach while open; closing it restores the previous pause state. Flight and orbit input are blocked under menus and dialogs.
 
 ## Architecture
 
@@ -129,6 +138,9 @@ Complete each mission above its unlock threshold to open the next.
 - `src/game/audio.ts`: procedural Web Audio flight feedback
 - `src/game/replay.ts`: serializable recorder and playback sampling
 - `src/game/persistence.ts`: local pilot records and settings
+- `src/game/landingFeedback.ts`: shared landing cues and contact debrief formatting
+- `src/ui/`: blocking-surface focus management and debrief presentation
+- `src/render/flightFraming.ts`: portrait chase framing and camera-relative motion cues
 - `src/render/assetManifest.ts`: stable GLB runtime contract
 - `tests/simulation.test.ts`: deterministic physics regression suite
 - `tests/e2e/simulation.spec.ts`: desktop, mobile, WebGL, touchdown, and replay QA

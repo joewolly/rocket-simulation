@@ -19,9 +19,9 @@
 
     <section class="telemetry" aria-label="Flight telemetry">
       <div><span>ALTITUDE</span><strong id="altitude">--</strong><small>m</small></div>
-      <div><span>VERT SPEED</span><strong id="velocity">--</strong><small>m/s</small></div>
+      <div><span id="verticalDirection">DESCENT</span><strong id="velocity">--</strong><small>m/s</small></div>
       <div><span>FUEL</span><strong id="fuel">--</strong><small>%</small></div>
-      <div><span>DRIFT</span><strong id="drift">--</strong><small>m/s</small></div>
+      <div><span>DRIFT</span><strong id="drift">--</strong><i id="driftArrow" aria-hidden="true">↑</i><small>m/s</small></div>
     </section>
 
     <aside class="environment" aria-label="Environmental conditions">
@@ -55,7 +55,9 @@
       <div class="ticks"></div>
     </section>
 
-    <nav class="actions command-dock" aria-label="Simulation actions">
+    <button id="flightMenuButton" class="flight-menu-button" aria-controls="flightActions" aria-expanded="false">FLIGHT MENU</button>
+    <nav id="flightActions" class="actions command-dock" aria-label="Simulation actions">
+      <button id="closeFlightMenu" class="close-flight-menu" aria-label="Close flight menu">CLOSE</button>
       <span class="dock-status"><i></i><small>FLIGHT</small></span>
       <button id="missionButton" title="Choose mission"><b>◇</b><span>MISSIONS</span><kbd>M</kbd></button>
       <button id="cameraButton" title="Change camera"><b>◉</b><span>CAMERA</span><kbd>C</kbd></button>
@@ -73,10 +75,10 @@
     </div>
 
     <section id="replayTimeline" class="replay-timeline hidden" aria-label="Replay controls">
-      <span>REPLAY</span><input id="replayScrubber" type="range" min="0" max="100" value="0" /><output id="replayTime">00:00.0</output>
+      <span>REPLAY</span><input id="replayScrubber" aria-label="Replay position" type="range" min="0" max="100" value="0" /><output id="replayTime">00:00.0</output>
     </section>
 
-    <aside id="missionDrawer" class="drawer hidden" aria-label="Mission selection">
+    <aside id="missionDrawer" class="drawer hidden" role="dialog" aria-modal="true" aria-label="Mission selection" inert>
       <header><div><span class="eyebrow">FLIGHT PROGRAM</span><h2>RECOVERY MISSIONS</h2></div><button id="closeMissionButton" aria-label="Close missions">×</button></header>
       <p>Qualify on Odyssey, then progress through increasingly difficult recovery conditions.</p>
       <div id="missionList" class="mission-list"></div>
@@ -91,16 +93,18 @@
         <button data-control="right" aria-label="Tilt right">▶</button>
       </div>
       <div class="touch-throttle">
+        <output id="touchThrottle" aria-label="Current throttle">55%</output>
         <button data-control="throttleUp" aria-label="Increase throttle">+</button>
         <button data-control="throttleDown" aria-label="Decrease throttle">−</button>
       </div>
     </div>
 
-    <div id="modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="modalTitle" aria-describedby="modalCopy">
+    <div id="modal" class="modal hidden" inert role="dialog" aria-modal="true" aria-labelledby="modalTitle" aria-describedby="modalCopy">
       <div class="modal-card">
         <span id="modalEyebrow" class="eyebrow">MISSION STATUS</span>
         <h1 id="modalTitle">PAUSED</h1>
         <p id="modalCopy">Flight computer holding simulation time.</p>
+        <section id="landingDebrief" class="landing-debrief" hidden></section>
         <button id="modalAction">RESUME FLIGHT</button>
         <button id="modalReplay" class="secondary-action hidden">VIEW REPLAY</button>
       </div>
