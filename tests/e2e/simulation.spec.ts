@@ -37,7 +37,8 @@ test("mobile flight controls preserve the playfield",async({page})=>{
 });
 
 test("assisted flight reaches touchdown and exposes replay",async({page})=>{
-  test.setTimeout(60_000);
+  // Hosted software rendering needs time for both debrief and replay captures.
+  test.setTimeout(90_000);
   await page.goto("/?simSpeed=6");
   await expect(page.locator("#altitude")).not.toHaveText("--");
   await page.keyboard.press("KeyA");
@@ -56,6 +57,8 @@ test("assisted flight reaches touchdown and exposes replay",async({page})=>{
 
 
 test("touch-only flight menu supports missions, camera, assist, pause and reset", async ({ browser }) => {
+  // Multiple touch transitions plus screenshot capture exceed the default CI budget.
+  test.setTimeout(60_000);
   const context = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
   const page = await context.newPage();
   await page.goto("/");
